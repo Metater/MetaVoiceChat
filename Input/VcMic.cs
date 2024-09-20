@@ -1,4 +1,4 @@
-// https://github.com/adrenak/unimic/blob/master/Assets/UniMic/Runtime/Mic.cs
+// Based on: https://github.com/adrenak/unimic/blob/master/Assets/UniMic/Runtime/Mic.cs
 
 using System;
 using System.Collections;
