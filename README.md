@@ -1,7 +1,7 @@
 # MetaVoiceChat
  
 ## A simple and self-contained proximity voice chat solution for Unity's popular client-server networking libraries (currently only is Mirror supported*) with all of the features you need.
-&ast; Other libraries can easily be implemented by composing an agnostic MonoBehaviour -- please help with additional implementations.
+&ast; Other libraries can easily be implemented by composing an agnostic MonoBehaviour — please feel free to contribute additional implementations.
 
 ### A massive thank you to [Vatsal Ambastha](https://github.com/adrenak) and his projects [UniVoice](https://github.com/adrenak/univoice) and [UniMic](https://github.com/adrenak/unimic) that were heavily referenced when starting this project in late 2023.
 
