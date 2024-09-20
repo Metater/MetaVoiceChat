@@ -2,7 +2,7 @@
 
 using System;
 using System.Collections;
-using System.Text;
+using Assets.Metater.MetaUtils;
 using UnityEngine;
 
 namespace Assets.Metater.MetaVoiceChat.Output
@@ -22,12 +22,10 @@ namespace Assets.Metater.MetaVoiceChat.Output
         private readonly System.Diagnostics.Stopwatch segmentStopwatch = new();
         private float TimeSinceSegment => (float)segmentStopwatch.Elapsed.TotalSeconds;
 
-        private readonly StringBuilder csv = new();
+        private readonly MetaCsv csv = new("Time", "Error");
 
         public VcAudioOutput(VcConfig config)
         {
-            csv.AppendLine("Time,Error");
-
             this.config = config;
             audioSource = config.OutputAudioSource;
 
@@ -105,7 +103,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
                         float error = errorSegments * config.SegmentPeriodMs;
                         //ema.Add(error);
                         //csv.AppendLine(Time.time + "," + ema.Value);
-                        csv.AppendLine(Time.time + "," + error);
+                        csv.AddRow(Time.time, error);
                         //csv.AppendLine(Time.time + "," + GetRawLatency());
                     }
 
@@ -230,7 +228,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
             vcAudioClip.Dispose();
             config.CoroutineProvider.StopCoroutine(updateCoroutine);
 
-            Debug.Log(csv.ToString());
+            csv.Dispose();
         }
     }
 }

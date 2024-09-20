@@ -21,11 +21,12 @@ TODO
     - Input muting yourself
     - Output muting others
 - UI settings and indicators with hooks and an official implementation that saves to PlayerPrefs
-- Dynamic desync compensation using a latency error P controller with RMS jitter adjustment
+- Dynamic desync compensation using a latency error P-controller with RMS jitter adjustment
 
 ### Planned Features
 - Opus audio encoding
 - Documentation
+- Push to talk
 
 ## Implementations
 - [Mirror](https://github.com/MirrorNetworking/Mirror)
