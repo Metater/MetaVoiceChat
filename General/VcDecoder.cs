@@ -6,7 +6,7 @@ namespace Assets.Metater.MetaVoiceChat.General
     public class VcDecoder : IDisposable
     {
         private readonly IOpusDecoder opusDecoder;
-        private readonly short[] buffer;
+        private readonly float[] buffer;
 
         public string Version => opusDecoder.GetVersionString();
 
@@ -16,10 +16,10 @@ namespace Assets.Metater.MetaVoiceChat.General
 
             //opusDecoder.Gain
 
-            buffer = new short[config.general.samplesPerFrame];
+            buffer = new float[config.general.samplesPerFrame];
         }
 
-        public ReadOnlySpan<short> Decode(ReadOnlySpan<byte> frame, bool decodeFec = false)
+        public ReadOnlySpan<float> DecodeFrame(ReadOnlySpan<byte> frame, bool decodeFec = false)
         {
             int frameSize = buffer.Length;
             int samplesDecoded = opusDecoder.Decode(frame, buffer, frameSize, decodeFec);

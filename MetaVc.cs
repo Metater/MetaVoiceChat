@@ -1,6 +1,3 @@
-#define ECHO
-// ^^^ Use this to echo the local voice
-
 // This is a derivative work of the following projects, which were created by Vatsal Ambastha:
 // https://github.com/adrenak/univoice
 // https://github.com/adrenak/univoice-unimic-input
@@ -68,6 +65,7 @@
 // MirrorVcManager could be created to handle all of the networking in a single place and to batch frames with the same timestamp sending from the server to clients,
 // however this is extra complexity
 
+using System;
 using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.Output;
@@ -81,6 +79,10 @@ namespace Assets.Metater.MetaVoiceChat
     {
         public VcConfig config;
 
+        /// <summary>
+        /// This plays back the voice of the local player
+        /// </summary>
+        public bool IsEchoEnabled { get; set; }
         /// <summary>
         /// This is the local player and they don't want to hear anyone else
         /// </summary>
@@ -98,7 +100,7 @@ namespace Assets.Metater.MetaVoiceChat
         /// </summary>
         public bool IsSpeaking { get; set; }
 
-        public IVcImpl Impl { get; set; }
+        public INetProvider VcImpl { get; set; }
 
         public bool IsLocalPlayer { get; private set; }
 
@@ -113,12 +115,12 @@ namespace Assets.Metater.MetaVoiceChat
         public VcAudioInput AudioInput { get; private set; }
         public VcAudioOutput AudioOutput { get; private set; }
 
-        public void StartClient(IVcImpl impl, bool isLocalPlayer, int maxDataBytesPerPacket)
+        public void StartClient(INetProvider vcImpl, bool isLocalPlayer, int maxDataBytesPerPacket)
         {
             config.general.Cache(config, this);
             config.general.outputAudioSource.dopplerLevel = 0;
 
-            Impl = impl;
+            VcImpl = vcImpl;
 
             IsLocalPlayer = isLocalPlayer;
 
@@ -133,20 +135,16 @@ namespace Assets.Metater.MetaVoiceChat
                 AudioInput = new(config);
                 AudioInput.OnFrameReady += SendFrame;
             }
-#if !ECHO
-            else
-#endif
-            {
-                Decoder = new(config);
 
-                // TODO Make settings configurable
-                RemoteJitter = new(1, 0);
+            Decoder = new(config);
 
-                AudioOutput = new(config);
-            }
+            // TODO Make settings configurable, also 1 second window is too big, maybe 100ms
+            RemoteJitter = new(1, 0);
+
+            AudioOutput = new(config);
         }
 
-        private void SendFrame(int segmentIndex, float[] segment)
+        private void SendFrame(int index, float[] samples)
         {
             //if (segment != null)
             //{
@@ -156,37 +154,20 @@ namespace Assets.Metater.MetaVoiceChat
             //    }
             //}
 
-            bool isSpeaking = segment != null;
+            bool isSpeaking = samples != null;
 
             IsSpeaking = isSpeaking;
 
-            bool shouldSendEmpty = !isSpeaking || IsDeafened || IsInputMuted;
-            if (shouldSendEmpty)
+            bool shouldRelayEmpty = !isSpeaking || IsDeafened || IsInputMuted;
+            if (shouldRelayEmpty)
             {
-                CmdRelayEmptyAudioSegment(segmentIndex, LocalJitter.TimeSinceStart);
+                VcImpl.RelayFrame(index, LocalJitter.TimeSinceStart, null);
             }
             else
             {
-                //if (Random.value < 0.05f)
-                //{
-                //    return;
-                //}
-
-                // TODO Dont send audio to players that are too far away. Maybe send this, but go inside of the CmdRelay place and relay and empty segment
-                // instead if out of range, use audio listener reference and position of mouth.
-                CmdRelayAudioSegment(segmentIndex, new(netId, segmentIndex, segment), LocalJitter);
+                var data = Encoder.EncodeFrame(samples.AsSpan());
+                VcImpl.RelayFrame(index, LocalJitter.TimeSinceStart, data);
             }
-
-            //short[] frame = new short[segment.Length];
-            //for (int i = 0; i < segment.Length; i++)
-            //{
-            //    frame[i] = (short)(short.MaxValue * segment[i]);
-            //}
-
-            //var encodedData = Encoder.Encode(frame);
-            //var decodedData = Decoder.Decode(encodedData);
-
-            //print($"{encodedData.Length} {decodedData.Length}");
         }
 
         [Command(channel = Channels.Unreliable)]
@@ -201,7 +182,12 @@ namespace Assets.Metater.MetaVoiceChat
             RpcReceiveEmptyAudioSegment(segmentIndex, time);
         }
 
-#if ECHO
+        public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
+        {
+
+        }
+
+#if META_VOICE_CHAT_ECHO
         [ClientRpc(channel = Channels.Unreliable, includeOwner = true)]
 #else
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
@@ -209,7 +195,7 @@ namespace Assets.Metater.MetaVoiceChat
         private void RpcReceiveAudioSegment(int segmentIndex, VcSegment segment, double time)
         {
             SetIsSpeaking(true);
-            if (Impl.IsLocalPlayerDeafened || IsOutputMuted)
+            if (VcImpl.IsLocalPlayerDeafened || IsOutputMuted)
             {
                 AudioOutput.FeedSegment(segmentIndex);
             }
@@ -221,7 +207,7 @@ namespace Assets.Metater.MetaVoiceChat
             //float jitter = RemoteJitter.Update(time);
         }
 
-#if ECHO
+#if META_VOICE_CHAT_ECHO
         [ClientRpc(channel = Channels.Unreliable, includeOwner = true)]
 #else
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
@@ -247,10 +233,10 @@ namespace Assets.Metater.MetaVoiceChat
 
         private void SetIsSpeaking(bool value)
         {
-#if ECHO
+#if META_VOICE_CHAT_ECHO
             if (!IsLocalPlayer)
 #endif
-                IsSpeaking = value;
+            IsSpeaking = value;
         }
     }
 }

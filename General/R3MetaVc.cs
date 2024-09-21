@@ -8,6 +8,10 @@ namespace Assets.Metater.MetaVoiceChat.General
     public class R3MetaVc : MetaVc
     {
         /// <summary>
+        /// This plays back the voice of the local player
+        /// </summary>
+        public SerializableReactiveProperty<bool> isEchoEnabled;
+        /// <summary>
         /// This is the local player and they don't want to hear anyone else
         /// </summary>
         public SerializableReactiveProperty<bool> isDeafened;

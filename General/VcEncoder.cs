@@ -48,7 +48,7 @@ namespace Assets.Metater.MetaVoiceChat.General
             frameSize = config.general.samplesPerFrame;
         }
 
-        public ReadOnlySpan<byte> Encode(ReadOnlySpan<short> frame)
+        public ReadOnlySpan<byte> EncodeFrame(ReadOnlySpan<float> frame)
         {
             int bytesEncoded = opusEncoder.Encode(frame, frameSize, buffer, buffer.Length);
             return buffer.AsSpan(0, bytesEncoded);
