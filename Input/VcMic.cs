@@ -72,7 +72,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
             StopRecording();
             IsRecording = true;
 
-            AudioClip = Microphone.Start(CurrentDeviceName, true, config.LoopSeconds, config.SamplesPerSecond);
+            AudioClip = Microphone.Start(CurrentDeviceName, true, VcConfig.ClipLoopSeconds, VcConfig.SamplesPerSecond);
 
             if (AudioClip == null)
             {
@@ -84,14 +84,14 @@ namespace Assets.Metater.MetaVoiceChat.Input
                 throw new Exception("Voice chat microphone must have exactly one channel!");
             }
 
-            recordCoroutine = config.CoroutineProvider.StartCoroutine(CoRecord());
+            recordCoroutine = config.general.coroutineProvider.StartCoroutine(CoRecord());
         }
 
         public void StopRecording()
         {
             if (recordCoroutine != null)
             {
-                config.CoroutineProvider.StopCoroutine(recordCoroutine);
+                config.general.coroutineProvider.StopCoroutine(recordCoroutine);
                 recordCoroutine = null;
             }
 
@@ -112,7 +112,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
             int loops = 0;
             int readAbsPos = 0;
             int prevPos = 0;
-            float[] segment = new float[config.SamplesPerSegment];
+            float[] segment = new float[config.general.samplesPerFrame];
 
             while (AudioClip != null && Microphone.IsRecording(CurrentDeviceName))
             {

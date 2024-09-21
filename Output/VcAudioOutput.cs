@@ -27,7 +27,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
         public VcAudioOutput(VcConfig config)
         {
             this.config = config;
-            audioSource = config.OutputAudioSource;
+            audioSource = config.general.outputAudioSource;
 
             vcAudioClip = new(config);
             clipSegmentIndicies = new int[config.OutputSegmentCount];
@@ -36,7 +36,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
                 clipSegmentIndicies[i] = -1;
             }
 
-            updateCoroutine = config.CoroutineProvider.StartCoroutine(CoUpdate());
+            updateCoroutine = config.general.coroutineProvider.StartCoroutine(CoUpdate());
         }
 
         private IEnumerator CoUpdate()
@@ -62,8 +62,8 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
                 if (receivedSegments != 0)
                 {
-                    float timeSinceFirstSegment = ((float)receivedSegments / config.SegmentsPerSecond) + TimeSinceSegment;
-                    float targetLatency = (float)config.OutputLagSegmentsTarget / config.SegmentsPerSecond;
+                    float timeSinceFirstSegment = ((float)receivedSegments / config.general.framesPerSecond) + TimeSinceSegment;
+                    float targetLatency = (float)config.OutputLagSegmentsTarget / config.general.framesPerSecond;
                     if (timeSinceFirstSegment >= targetLatency)
                     {
                         audioSource.time = GetWrappedTime(firstSegmentIndex);
@@ -100,7 +100,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
                     float errorSegments = config.OutputLagSegmentsTarget - latencySegments;
 
                     {
-                        float error = errorSegments * config.SegmentPeriodMs;
+                        float error = errorSegments * config.general.framePeriodMs;
                         //ema.Add(error);
                         //csv.AppendLine(Time.time + "," + ema.Value);
                         csv.AddRow(Time.time, error);
@@ -201,7 +201,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
         private float GetWrappedTime(int segmentIndex)
         {
-            return (float)vcAudioClip.GetOffsetSegments(segmentIndex) * config.SegmentPeriodMs / 1000f;
+            return (float)vcAudioClip.GetOffsetSegments(segmentIndex) * config.general.framePeriodMs / 1000f;
         }
 
         public void FeedSegment(int segmentIndex, float[] segment = null)
@@ -226,7 +226,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
         public void Dispose()
         {
             vcAudioClip.Dispose();
-            config.CoroutineProvider.StopCoroutine(updateCoroutine);
+            config.general.coroutineProvider.StopCoroutine(updateCoroutine);
 
             csv.Dispose();
         }

@@ -12,7 +12,7 @@ TODO
 - No code required
 - Many configurable settings
 - Voice activation detection and latching
-- Pooled data buffers with no runtime allocation
+- Pooled data buffers with no runtime allocat6ion
 - 16-bit PCM audio
 - "ECHO" compilation symbol to playback your own voice when testing
 - Functionality and events ([R3](https://github.com/Cysharp/R3) implementation) for
@@ -22,6 +22,10 @@ TODO
     - Output muting others
 - UI settings and indicators with hooks and an official implementation that saves to PlayerPrefs
 - Dynamic desync compensation using a latency error P-controller with RMS jitter adjustment
+- Opus features
+    - Variable bitrate encoding
+    - Many exposed settings
+- TODO FILL IN OTHER FEATURES
 
 ### Planned Features
 - Opus audio encoding
@@ -49,6 +53,9 @@ TODO
 ### Missing Features
 - Tutorials
 - Examples
+- Multiple sample rates
+- Dual audio channel support
+- Multithreading for Opus
 - Agnostic audio inputs and outputs
     - Audio transmission other than voice
     - Configurable filtering pipeline
@@ -63,7 +70,6 @@ TODO
         - Soft channel fade
     - Opus features
         - Forward error correction
-        - Dynamic bitrate
     - Multiple chat rooms
 
 ## License

@@ -10,14 +10,14 @@ namespace Assets.Metater.MetaVoiceChat.Input
         public readonly VcAudioProcessor processor;
         public readonly VcMic mic;
 
-        public event Action<int, float[]> OnSegmentReady;
+        public event Action<int, float[]> OnFrameReady;
 
         //private double lastDetectionSeconds = double.MinValue;
 
         public VcAudioInput(VcConfig config)
         {
             this.config = config;
-            processor = config.AudioProcessor;
+            processor = config.general.audioProcessor;
 
             mic = new(config);
             mic.StartRecording();
@@ -35,7 +35,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
             //bool shouldSpeak = Meta.Realtime - config.DetectionLatchSeconds < lastDetectionSeconds;
             //if (shouldSpeak)
             //{
-            OnSegmentReady?.Invoke(segmentIndex, segment);
+            OnFrameReady?.Invoke(segmentIndex, segment);
             //}
             //else
             //{

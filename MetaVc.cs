@@ -1,5 +1,5 @@
 #define ECHO
-// ^^^ Use this to echo the local voice.
+// ^^^ Use this to echo the local voice
 
 // This is a derivative work of the following projects, which were created by Vatsal Ambastha:
 // https://github.com/adrenak/univoice
@@ -61,85 +61,92 @@
 
 // Post on reddit and mirror discord to advertise
 
-using System.Diagnostics;
-using System.Text;
-using Assets.Metater.MetaRefs;
+// TODO You might want to switch from 25ms segments to 20ms segments to better support opus
+
+// TODO FIX ISSUE WHERE YOU CANT SEND MORE THAN ONE PACKET PER FRAME, THIS IS VERY BAD, < 50 FPS MEANS TERRIBLE QUALITY
+
+// MirrorVcManager could be created to handle all of the networking in a single place and to batch frames with the same timestamp sending from the server to clients,
+// however this is extra complexity
+
+using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.Output;
+using Assets.Metater.MetaVoiceChat.VcImpls;
 using Mirror;
-using R3;
 using UnityEngine;
 
 namespace Assets.Metater.MetaVoiceChat
 {
-    public class MetaVc : MetaNbl<MetaVc>
+    public class MetaVc : MonoBehaviour
     {
-        [Header("General")]
         public VcConfig config;
 
-        [Header("Values")]
         /// <summary>
         /// This is the local player and they don't want to hear anyone else
         /// </summary>
-        public SerializableReactiveProperty<bool> isDeafened;
+        public bool IsDeafened { get; set; }
         /// <summary>
         /// This is the local player and they don't want anyone to hear them
         /// </summary>
-        public SerializableReactiveProperty<bool> isInputMuted;
+        public bool IsInputMuted { get; set; }
         /// <summary>
         /// This is a remote player that the local player doesn't want to hear
         /// </summary>
-        public SerializableReactiveProperty<bool> isOutputMuted;
+        public bool IsOutputMuted { get; set; }
         /// <summary>
         /// This is the local player and they are speaking
         /// </summary>
-        public SerializableReactiveProperty<bool> isSpeaking;
+        public bool IsSpeaking { get; set; }
 
-        private VcAudioInput audioInput;
-        private VcAudioOutput audioOutput;
+        public IVcImpl Impl { get; set; }
 
-        private VcLocalJitter localJitter;
-        private VcRemoteJitter remoteJitter;
+        public bool IsLocalPlayer { get; private set; }
 
-        private AudioListener audioListener;
+        public AudioListener AudioListener { get; private set; }
 
-        private readonly StringBuilder csv = new();
+        public VcEncoder Encoder { get; private set; }
+        public VcDecoder Decoder { get; private set; }
 
-        private void Awake()
+        public VcLocalJitter LocalJitter { get; private set; }
+        public VcRemoteJitter RemoteJitter { get; private set; }
+
+        public VcAudioInput AudioInput { get; private set; }
+        public VcAudioOutput AudioOutput { get; private set; }
+
+        public void StartClient(IVcImpl impl, bool isLocalPlayer, int maxDataBytesPerPacket)
         {
-            config.CoroutineProvider = this;
-            config.OutputAudioSource.dopplerLevel = 0;
-            VcSegment.Registry.SetSamplesPerSegment(config.SamplesPerSegment);
+            config.general.Cache(config, this);
+            config.general.outputAudioSource.dopplerLevel = 0;
 
-            csv.AppendLine("Time,Jitter");
-            //csv.AppendLine("Time,Diff");
-            //csv.AppendLine("Time,dt");
+            Impl = impl;
 
-            audioListener = FindObjectOfType<AudioListener>();
-        }
+            IsLocalPlayer = isLocalPlayer;
 
-        protected override void MetaOnStartClient()
-        {
+            AudioListener = FindObjectOfType<AudioListener>();
+
             if (isLocalPlayer)
             {
-                audioInput = new(config);
-                audioInput.OnSegmentReady += SendAudioSegment;
+                Encoder = new(config, maxDataBytesPerPacket);
 
-                localJitter = new();
+                LocalJitter = new();
+
+                AudioInput = new(config);
+                AudioInput.OnFrameReady += SendFrame;
             }
 #if !ECHO
             else
 #endif
             {
-                audioOutput = new(config);
+                Decoder = new(config);
 
-                remoteJitter = new(1, 0);
+                // TODO Make settings configurable
+                RemoteJitter = new(1, 0);
+
+                AudioOutput = new(config);
             }
         }
 
-        Stopwatch test = new Stopwatch();
-
-        private void SendAudioSegment(int segmentIndex, float[] segment)
+        private void SendFrame(int segmentIndex, float[] segment)
         {
             //if (segment != null)
             //{
@@ -151,12 +158,12 @@ namespace Assets.Metater.MetaVoiceChat
 
             bool isSpeaking = segment != null;
 
-            this.isSpeaking.Value = isSpeaking;
+            IsSpeaking = isSpeaking;
 
-            bool shouldSendEmpty = !isSpeaking || isDeafened.Value || isInputMuted.Value;
+            bool shouldSendEmpty = !isSpeaking || IsDeafened || IsInputMuted;
             if (shouldSendEmpty)
             {
-                CmdRelayEmptyAudioSegment(segmentIndex, localJitter.TimeSinceStart);
+                CmdRelayEmptyAudioSegment(segmentIndex, LocalJitter.TimeSinceStart);
             }
             else
             {
@@ -167,12 +174,19 @@ namespace Assets.Metater.MetaVoiceChat
 
                 // TODO Dont send audio to players that are too far away. Maybe send this, but go inside of the CmdRelay place and relay and empty segment
                 // instead if out of range, use audio listener reference and position of mouth.
-                CmdRelayAudioSegment(segmentIndex, new(netId, segmentIndex, segment), localJitter.TimeSinceStart);
+                CmdRelayAudioSegment(segmentIndex, new(netId, segmentIndex, segment), LocalJitter);
             }
 
-            //csv.AppendLine(Time.time + "," + test.Elapsed.TotalSeconds);
-            //csv.AppendLine(Time.time + "," + Time.deltaTime);
-            test.Restart();
+            //short[] frame = new short[segment.Length];
+            //for (int i = 0; i < segment.Length; i++)
+            //{
+            //    frame[i] = (short)(short.MaxValue * segment[i]);
+            //}
+
+            //var encodedData = Encoder.Encode(frame);
+            //var decodedData = Decoder.Decode(encodedData);
+
+            //print($"{encodedData.Length} {decodedData.Length}");
         }
 
         [Command(channel = Channels.Unreliable)]
@@ -195,17 +209,16 @@ namespace Assets.Metater.MetaVoiceChat
         private void RpcReceiveAudioSegment(int segmentIndex, VcSegment segment, double time)
         {
             SetIsSpeaking(true);
-            if (LocalPlayerInstance.isDeafened.Value || isOutputMuted.Value)
+            if (Impl.IsLocalPlayerDeafened || IsOutputMuted)
             {
-                audioOutput.FeedSegment(segmentIndex);
+                AudioOutput.FeedSegment(segmentIndex);
             }
             else
             {
-                audioOutput.FeedSegment(segmentIndex, segment.UncompressedBuffer);
+                AudioOutput.FeedSegment(segmentIndex, segment.UncompressedBuffer);
             }
 
-            float jitter = remoteJitter.Update(time);
-            csv.AppendLine(Time.time + "," + jitter);
+            //float jitter = RemoteJitter.Update(time);
         }
 
 #if ECHO
@@ -216,31 +229,28 @@ namespace Assets.Metater.MetaVoiceChat
         private void RpcReceiveEmptyAudioSegment(int segmentIndex, double time)
         {
             SetIsSpeaking(false);
-            audioOutput.FeedSegment(segmentIndex);
+            AudioOutput.FeedSegment(segmentIndex);
 
-            float jitter = remoteJitter.Update(time);
-            csv.AppendLine(Time.time + "," + jitter);
+            //float jitter = RemoteJitter.Update(time);
         }
 
-        protected override void MetaOnStopClient()
+        public void StopClient(bool isLocalPlayer)
         {
-            if (audioInput != null)
+            if (AudioInput != null)
             {
-                audioInput.OnSegmentReady -= SendAudioSegment;
-                audioInput.Dispose();
+                AudioInput.OnFrameReady -= SendFrame;
+                AudioInput.Dispose();
             }
 
-            audioOutput?.Dispose();
-
-            print(csv.ToString());
+            AudioOutput?.Dispose();
         }
 
         private void SetIsSpeaking(bool value)
         {
 #if ECHO
-            if (!isLocalPlayer)
+            if (!IsLocalPlayer)
 #endif
-                isSpeaking.Value = value;
+                IsSpeaking = value;
         }
     }
 }
