@@ -19,10 +19,9 @@ namespace Assets.Metater.MetaVoiceChat.General
             buffer = new float[config.general.samplesPerFrame];
         }
 
-        public ReadOnlySpan<float> DecodeFrame(ReadOnlySpan<byte> frame, bool decodeFec = false)
+        public ReadOnlySpan<float> DecodeFrame(ReadOnlySpan<byte> data, bool decodeFec = false)
         {
-            int frameSize = buffer.Length;
-            int samplesDecoded = opusDecoder.Decode(frame, buffer, frameSize, decodeFec);
+            int samplesDecoded = opusDecoder.Decode(data, buffer, buffer.Length, decodeFec);
             return buffer.AsSpan(0, samplesDecoded);
         }
 

@@ -68,8 +68,8 @@
 using System;
 using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
+using Assets.Metater.MetaVoiceChat.NetProviders;
 using Assets.Metater.MetaVoiceChat.Output;
-using Assets.Metater.MetaVoiceChat.VcImpls;
 using Mirror;
 using UnityEngine;
 
@@ -161,30 +161,32 @@ namespace Assets.Metater.MetaVoiceChat
             bool shouldRelayEmpty = !isSpeaking || IsDeafened || IsInputMuted;
             if (shouldRelayEmpty)
             {
-                VcImpl.RelayFrame(index, LocalJitter.TimeSinceStart, null);
+                var timestamp = LocalJitter.TimeSinceStart;
+
+                if (IsEchoEnabled)
+                {
+                    ReceiveFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
+                }
+
+                VcImpl.RelayFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
             }
             else
             {
+                var timestamp = LocalJitter.TimeSinceStart;
                 var data = Encoder.EncodeFrame(samples.AsSpan());
+
+                if (IsEchoEnabled)
+                {
+                    ReceiveFrame(index, timestamp, data);
+                }
+
                 VcImpl.RelayFrame(index, LocalJitter.TimeSinceStart, data);
             }
         }
 
-        [Command(channel = Channels.Unreliable)]
-        private void CmdRelayAudioSegment(int segmentIndex, VcSegment segment, double time)
-        {
-            RpcReceiveAudioSegment(segmentIndex, segment, time);
-        }
-
-        [Command(channel = Channels.Unreliable)]
-        private void CmdRelayEmptyAudioSegment(int segmentIndex, double time)
-        {
-            RpcReceiveEmptyAudioSegment(segmentIndex, time);
-        }
-
         public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-
+            var
         }
 
 #if META_VOICE_CHAT_ECHO
@@ -220,7 +222,7 @@ namespace Assets.Metater.MetaVoiceChat
             //float jitter = RemoteJitter.Update(time);
         }
 
-        public void StopClient(bool isLocalPlayer)
+        public void StopClient()
         {
             if (AudioInput != null)
             {

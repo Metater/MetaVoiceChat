@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Mirror;
 using UnityEngine;
 
-namespace Assets.Metater.MetaVoiceChat.VcImpls.Mirror
+namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 {
     [RequireComponent(typeof(MetaVc))]
     public class MirrorNetProvider : NetworkBehaviour, INetProvider
@@ -38,7 +38,6 @@ namespace Assets.Metater.MetaVoiceChat.VcImpls.Mirror
             static int GetMaxDataBytesPerPacket()
             {
                 int bytes = NetworkMessages.MaxMessageSize(Channels.Unreliable) - 13;
-                bytes -= sizeof(bool); // Is speaking
                 bytes -= sizeof(double); // Timestamp
                 bytes -= sizeof(ushort); // Array length
                 return bytes;
@@ -58,16 +57,11 @@ namespace Assets.Metater.MetaVoiceChat.VcImpls.Mirror
             instances.Remove(this);
             #endregion
 
-            MetaVc.StopClient(isLocalPlayer);
+            MetaVc.StopClient();
         }
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-            if (MetaVc.IsEchoEnabled)
-            {
-                MetaVc.ReceiveFrame(index, timestamp, data);
-            }
-
             CmdRelayFrame(index, timestamp);
         }
 
