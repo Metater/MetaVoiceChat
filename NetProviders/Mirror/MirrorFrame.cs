@@ -1,16 +1,14 @@
 #if MIRROR
 using System;
-using System.Buffers;
 using Mirror;
 
-namespace Assets.Metater.MetaVoiceChat.NetProvider.Mirror
+namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 {
     public readonly struct MirrorFrame
     {
         public readonly int index;
         public readonly double timestamp;
         public readonly ArraySegment<byte> data;
-        public readonly bool isArrayRented;
 
         public ushort Length => (ushort)data.Count;
 
@@ -19,7 +17,6 @@ namespace Assets.Metater.MetaVoiceChat.NetProvider.Mirror
             this.index = index;
             this.timestamp = timestamp;
             this.data = data;
-            isArrayRented = false;
         }
 
         public MirrorFrame(int index, double timestamp)
@@ -27,29 +24,6 @@ namespace Assets.Metater.MetaVoiceChat.NetProvider.Mirror
             this.index = index;
             this.timestamp = timestamp;
             data = ArraySegment<byte>.Empty;
-            isArrayRented = false;
-        }
-
-        public MirrorFrame(int index, double timestamp, ReadOnlySpan<byte> data)
-        {
-            this.index = index;
-            this.timestamp = timestamp;
-
-            var array = ArrayPool<byte>.Shared.Rent(data.Length);
-            data.CopyTo(array);
-            this.data = new ArraySegment<byte>(array, 0, data.Length);
-
-            isArrayRented = true;
-        }
-
-        public void ReturnArray()
-        {
-            if (!isArrayRented)
-            {
-                throw new Exception("Attempted to return a MirrorFrame without a rented array.");
-            }
-
-            ArrayPool<byte>.Shared.Return(data.Array);
         }
     }
 

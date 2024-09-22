@@ -82,7 +82,7 @@ namespace Assets.Metater.MetaVoiceChat
         /// <summary>
         /// This plays back the voice of the local player
         /// </summary>
-        public bool IsEchoEnabled { get; set; }
+        public bool IsEchoEnabled { get; set; } = true;
         /// <summary>
         /// This is the local player and they don't want to hear anyone else
         /// </summary>

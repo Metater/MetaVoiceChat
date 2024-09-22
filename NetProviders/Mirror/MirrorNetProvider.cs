@@ -1,7 +1,7 @@
 #if MIRROR
 using System;
+using System.Buffers;
 using System.Collections.Generic;
-using Assets.Metater.MetaVoiceChat.NetProvider.Mirror;
 using Mirror;
 using UnityEngine;
 
@@ -64,9 +64,14 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-            MirrorFrame frame = new(index, timestamp, data);
+            var array = ArrayPool<byte>.Shared.Rent(data.Length);
+            data.CopyTo(array);
+            var arraySegment = new ArraySegment<byte>(array, 0, data.Length);
+
+            MirrorFrame frame = new(index, timestamp, arraySegment);
             CmdRelayFrame(frame);
-            frame.ReturnArray();
+
+            ArrayPool<byte>.Shared.Return(array);
         }
 
         [Command(channel = Channels.Unreliable)]
