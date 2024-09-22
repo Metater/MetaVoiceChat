@@ -7,7 +7,7 @@ namespace Assets.Metater.MetaVoiceChat
     public class VcLocalJitter
     {
         private readonly System.Diagnostics.Stopwatch stopwatch = new();
-        public double TimeSinceStart => stopwatch.Elapsed.TotalSeconds;
+        public double Timestamp => stopwatch.Elapsed.TotalSeconds;
 
         public VcLocalJitter()
         {
@@ -21,11 +21,11 @@ namespace Assets.Metater.MetaVoiceChat
         private readonly float defaultJitter;
 
         private readonly System.Diagnostics.Stopwatch stopwatch = new();
-        private float TimeSinceUpdate => (float)stopwatch.Elapsed.TotalSeconds;
+        private float TimeSincePreviousUpdate => (float)stopwatch.Elapsed.TotalSeconds;
 
         private readonly Queue<Diff> diffs = new();
 
-        private double previousTime;
+        private double previousTimestamp;
 
         public VcRemoteJitter(double window, float defaultJitter)
         {
@@ -33,30 +33,30 @@ namespace Assets.Metater.MetaVoiceChat
             this.defaultJitter = defaultJitter;
         }
 
-        public float Update(double time)
+        public float Update(double timestamp)
         {
             if (!stopwatch.IsRunning)
             {
                 stopwatch.Restart();
-                previousTime = time;
+                previousTimestamp = timestamp;
                 return defaultJitter;
             }
 
-            float diff = (float)(time - previousTime) - TimeSinceUpdate;
-            diffs.Enqueue(new Diff(time, diff));
+            float diff = (float)(timestamp - previousTimestamp) - TimeSincePreviousUpdate;
+            diffs.Enqueue(new Diff(timestamp, diff));
 
 
-            if (time > previousTime)
+            if (timestamp > previousTimestamp)
             {
-                previousTime = time;
+                previousTimestamp = timestamp;
             }
 
-            return CalculateRmsJitter(time);
+            return CalculateRmsJitter(timestamp);
         }
 
-        private float CalculateRmsJitter(double time)
+        private float CalculateRmsJitter(double timestamp)
         {
-            RemoveOldDiffs(time);
+            RemoveOldDiffs(timestamp);
             stopwatch.Restart();
 
             if (diffs.Count > 0)
@@ -68,11 +68,11 @@ namespace Assets.Metater.MetaVoiceChat
             return defaultJitter;
         }
 
-        private void RemoveOldDiffs(double time)
+        private void RemoveOldDiffs(double timestamp)
         {
             while (diffs.TryPeek(out var diff))
             {
-                if (diff.GetAge(time) > window)
+                if (diff.GetAge(timestamp) > window)
                 {
                     diffs.Dequeue();
                 }
@@ -85,18 +85,18 @@ namespace Assets.Metater.MetaVoiceChat
 
         private readonly struct Diff
         {
-            private readonly double enqueueTime;
+            private readonly double enqueueTimestamp;
             public readonly float diff;
 
-            public Diff(double enqueueTime, float diff)
+            public Diff(double enqueueTimestamp, float diff)
             {
-                this.enqueueTime = enqueueTime;
+                this.enqueueTimestamp = enqueueTimestamp;
                 this.diff = diff;
             }
 
-            public float GetAge(double time)
+            public float GetAge(double timestamp)
             {
-                return (float)(time - enqueueTime);
+                return (float)(timestamp - enqueueTimestamp);
             }
         }
     }

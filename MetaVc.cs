@@ -66,11 +66,11 @@
 // however this is extra complexity
 
 using System;
+using System.Buffers;
 using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.NetProviders;
 using Assets.Metater.MetaVoiceChat.Output;
-using Mirror;
 using UnityEngine;
 
 namespace Assets.Metater.MetaVoiceChat
@@ -161,7 +161,7 @@ namespace Assets.Metater.MetaVoiceChat
             bool shouldRelayEmpty = !isSpeaking || IsDeafened || IsInputMuted;
             if (shouldRelayEmpty)
             {
-                var timestamp = LocalJitter.TimeSinceStart;
+                var timestamp = LocalJitter.Timestamp;
 
                 if (IsEchoEnabled)
                 {
@@ -172,7 +172,7 @@ namespace Assets.Metater.MetaVoiceChat
             }
             else
             {
-                var timestamp = LocalJitter.TimeSinceStart;
+                var timestamp = LocalJitter.Timestamp;
                 var data = Encoder.EncodeFrame(samples.AsSpan());
 
                 if (IsEchoEnabled)
@@ -180,46 +180,38 @@ namespace Assets.Metater.MetaVoiceChat
                     ReceiveFrame(index, timestamp, data);
                 }
 
-                VcImpl.RelayFrame(index, LocalJitter.TimeSinceStart, data);
+                VcImpl.RelayFrame(index, LocalJitter.Timestamp, data);
             }
         }
 
         public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-            var
-        }
-
-#if META_VOICE_CHAT_ECHO
-        [ClientRpc(channel = Channels.Unreliable, includeOwner = true)]
-#else
-        [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
-#endif
-        private void RpcReceiveAudioSegment(int segmentIndex, VcSegment segment, double time)
-        {
-            SetIsSpeaking(true);
-            if (VcImpl.IsLocalPlayerDeafened || IsOutputMuted)
+            if (data.Length == 0)
             {
-                AudioOutput.FeedSegment(segmentIndex);
+                SetIsSpeaking(false);
+                AudioOutput.FeedSegment(index);
+
+                //float jitter = RemoteJitter.Update(time);
             }
             else
             {
-                AudioOutput.FeedSegment(segmentIndex, segment.UncompressedBuffer);
+                SetIsSpeaking(true);
+                if (VcImpl.IsLocalPlayerDeafened || IsOutputMuted)
+                {
+                    AudioOutput.FeedSegment(index);
+                }
+                else
+                {
+                    var samples = Decoder.DecodeFrame(data);
+                    // TODO ARRAY LENGTH IS GREATER THAN OR EQUAL TO THE SIZE
+                    var array = ArrayPool<float>.Shared.Rent(samples.Length);
+                    samples.CopyTo(array);
+                    AudioOutput.FeedSegment(index, array);
+                    ArrayPool<float>.Shared.Return(array);
+                }
+
+                //float jitter = RemoteJitter.Update(time);
             }
-
-            //float jitter = RemoteJitter.Update(time);
-        }
-
-#if META_VOICE_CHAT_ECHO
-        [ClientRpc(channel = Channels.Unreliable, includeOwner = true)]
-#else
-        [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
-#endif
-        private void RpcReceiveEmptyAudioSegment(int segmentIndex, double time)
-        {
-            SetIsSpeaking(false);
-            AudioOutput.FeedSegment(segmentIndex);
-
-            //float jitter = RemoteJitter.Update(time);
         }
 
         public void StopClient()
@@ -235,9 +227,11 @@ namespace Assets.Metater.MetaVoiceChat
 
         private void SetIsSpeaking(bool value)
         {
-#if META_VOICE_CHAT_ECHO
-            if (!IsLocalPlayer)
-#endif
+            if (IsEchoEnabled && IsLocalPlayer)
+            {
+                return;
+            }
+
             IsSpeaking = value;
         }
     }

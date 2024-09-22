@@ -1,6 +1,7 @@
 #if MIRROR
 using System;
 using System.Collections.Generic;
+using Assets.Metater.MetaVoiceChat.NetProvider.Mirror;
 using Mirror;
 using UnityEngine;
 
@@ -38,6 +39,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             static int GetMaxDataBytesPerPacket()
             {
                 int bytes = NetworkMessages.MaxMessageSize(Channels.Unreliable) - 13;
+                bytes -= sizeof(int); // Index
                 bytes -= sizeof(double); // Timestamp
                 bytes -= sizeof(ushort); // Array length
                 return bytes;
@@ -62,21 +64,23 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-            CmdRelayFrame(index, timestamp);
+            MirrorFrame frame = new(index, timestamp, data);
+            CmdRelayFrame(frame);
+            frame.ReturnArray();
         }
 
         [Command(channel = Channels.Unreliable)]
-        private void CmdRelayFrame(int index, double timestamp, NetworkConnectionToClient sender = null)
+        private void CmdRelayFrame(MirrorFrame frame)
         {
-            RpcReceiveFrame(index, timestamp);
+            RpcReceiveFrame(frame);
         }
 
-        // A possible optimization is to use target RPCs and only send filled arrays to clients that are within audible range, and empty to others.
+        // A possible optimization is to use target RPCs and only send filled arrays to clients that are within audible range, and empty arrays to others.
         // Audible range would be determined by the distance between the reciever's position and the sender's audio source position.
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
-        private void RpcReceiveFrame(int index, double timestamp)
+        private void RpcReceiveFrame(MirrorFrame frame)
         {
-            MetaVc.ReceiveFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
+            MetaVc.ReceiveFrame(frame.index, frame.timestamp, frame.data);
         }
     }
 }
