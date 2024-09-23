@@ -1,0 +1,12 @@
+{
+    "author": "Connor Myers",
+    "dependencies": { },
+    "description": "TODO",
+    "displayName": "MetaVoiceChat",
+    "keywords": [ "unity" ],
+    "license": "MIT",
+    "name": "com.metater.meta-voice-chat",
+    "repository": "github:Metater/MetaVoiceChat",
+    "unity": "2019.4",
+    "version": "0.1.0"
+}
