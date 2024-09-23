@@ -1,7 +1,7 @@
 #if MIRROR
 using System;
-using System.Buffers;
 using System.Collections.Generic;
+using Assets.Metater.MetaVoiceChat.General;
 using Mirror;
 using UnityEngine;
 
@@ -16,13 +16,13 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         public static IReadOnlyList<MirrorNetProvider> Instances => instances;
         #endregion
 
-        public MetaVc MetaVc { get; set; }
+        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.metaVc.isDeafened;
 
-        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.MetaVc.IsDeafened;
+        private MetaVc metaVc;
 
         private void Awake()
         {
-            MetaVc = GetComponent<MetaVc>();
+            metaVc = GetComponent<MetaVc>();
         }
 
         public override void OnStartClient()
@@ -45,7 +45,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
                 return bytes;
             }
 
-            MetaVc.StartClient(this, isLocalPlayer, GetMaxDataBytesPerPacket());
+            metaVc.StartClient(this, isLocalPlayer, GetMaxDataBytesPerPacket());
         }
 
         public override void OnStopClient()
@@ -59,19 +59,18 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             instances.Remove(this);
             #endregion
 
-            MetaVc.StopClient();
+            metaVc.StopClient();
         }
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
-            var array = ArrayPool<byte>.Shared.Rent(data.Length);
+            var array = FixedLengthArrayPool<byte>.Rent(data.Length);
             data.CopyTo(array);
-            var arraySegment = new ArraySegment<byte>(array, 0, data.Length);
 
-            MirrorFrame frame = new(index, timestamp, arraySegment);
+            MirrorFrame frame = new(index, timestamp, array);
             CmdRelayFrame(frame);
 
-            ArrayPool<byte>.Shared.Return(array);
+            FixedLengthArrayPool<byte>.Return(array);
         }
 
         [Command(channel = Channels.Unreliable)]
@@ -85,7 +84,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
         private void RpcReceiveFrame(MirrorFrame frame)
         {
-            MetaVc.ReceiveFrame(frame.index, frame.timestamp, frame.data);
+            metaVc.ReceiveFrame(frame.index, frame.timestamp, frame.data);
         }
     }
 }

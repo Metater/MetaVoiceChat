@@ -9,7 +9,7 @@ using Concentus;
 // Conclusions:
 // FEC may not be super useful -- it only helps with single packet loss
 
-// Raw bitrate without encoding = 16 * 16000 = 256000
+// Raw bitrate without encoding = 16 bits * 16000 Hz = 256000
 
 namespace Assets.Metater.MetaVoiceChat.General
 {
@@ -23,6 +23,7 @@ namespace Assets.Metater.MetaVoiceChat.General
 
         public VcEncoder(VcConfig config, int maxDataBytesPerPacket)
         {
+            // 1275 is the maximum packet size for Opus
             maxDataBytesPerPacket = Math.Min(maxDataBytesPerPacket, 1275);
 
             opusEncoder = OpusCodecFactory.CreateEncoder(VcConfig.SamplesPerSecond, VcConfig.ChannelCount, config.opus.application);

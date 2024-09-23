@@ -36,7 +36,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             writer.WriteUShort(value.Length);
             if (value.Length != 0)
             {
-                writer.WriteBytes(value.data.Array, 0, value.Length);
+                writer.WriteBytes(value.data.Array, value.data.Offset, value.Length);
             }
         }
 

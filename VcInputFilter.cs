@@ -1,12 +1,11 @@
 using System.Linq;
-using Assets.Metater.MetaRefs;
 using Assets.Metater.MetaUtils;
 using UnityEngine;
 using UnityEngine.Audio;
 
 namespace Assets.Metater.MetaVoiceChat
 {
-    public class VcAudioProcessor : MetaNbl<VcAudioProcessor>
+    public class VcInputFilter : MonoBehaviour
     {
         private readonly static string InputVolumeKey = $"{nameof(MetaVoiceChat)}.{nameof(inputVolume)}";
         private readonly static string OutputVolumeKey = $"{nameof(MetaVoiceChat)}.{nameof(outputVolume)}";
@@ -22,7 +21,9 @@ namespace Assets.Metater.MetaVoiceChat
         public MetaValue<float> currentInputVolume;
         public MetaValue<float> inputSensitivity;
 
-        public override void OnStartLocalPlayer()
+        //private double lastDetectionSeconds = double.MinValue;
+
+        private void Start()
         {
             inputVolume.Value = PlayerPrefs.GetFloat(InputVolumeKey, 1.0f);
             outputVolume.Value = PlayerPrefs.GetFloat(OutputVolumeKey, 1.0f);
@@ -32,6 +33,52 @@ namespace Assets.Metater.MetaVoiceChat
             inputVolume.AddListener(this, SaveInputVolume);
             outputVolume.AddListener(this, SetOutputVolume);
             inputSensitivity.AddListener(this, SaveInputSensitivity);
+        }
+
+        //private void Mic_OnFrameReady(int frameIndex, float[] frame)
+        //{
+        //    //bool isVoiceDetected = DetectVoice(segment);
+        //    //if (isVoiceDetected)
+        //    //{
+        //    //    lastDetectionSeconds = Meta.Realtime;
+        //    //}
+
+        //    //bool shouldSpeak = Meta.Realtime - config.DetectionLatchSeconds < lastDetectionSeconds;
+        //    //if (shouldSpeak)
+        //    //{
+        //    OnFrameReady?.Invoke(frameIndex, frame);
+        //    //}
+        //    //else
+        //    //{
+        //    //    OnSegmentReady?.Invoke(segmentIndex, null);
+        //    //}
+        //}
+
+        //private bool DetectVoice(float[] segment)
+        //{
+        //    float percentage = GetPercentageAboveThreshold(segment);
+        //    return percentage > config.DetectionPercentage;
+        //}
+
+        //private float GetPercentageAboveThreshold(float[] segment)
+        //{
+        //    float percentageIncrement = 1f / segment.Length;
+        //    float percentage = 0;
+        //    float detectionValue = config.DetectionValue;
+        //    foreach (float value in segment)
+        //    {
+        //        if (Math.Abs(value) > detectionValue)
+        //        {
+        //            percentage += percentageIncrement;
+        //        }
+        //    }
+
+        //    return percentage;
+        //}
+
+        public void Filter(ref float[] samples)
+        {
+
         }
 
         public bool Process(float[] segment)

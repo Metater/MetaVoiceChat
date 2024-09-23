@@ -30,26 +30,26 @@ namespace Assets.Metater.MetaVoiceChat.Output
             audioSource.clip = audioClip;
         }
 
-        public void WriteSegment(int offsetSegments, float[] segment)
+        public void WriteFrame(int offsetFrames, float[] frame)
         {
-            segment ??= emptyFrame;
+            frame ??= emptyFrame;
 
-            if (segment.Length != config.general.samplesPerFrame)
+            if (frame.Length != config.general.samplesPerFrame)
             {
-                throw new Exception("Voice chat audio clip segment length does not match the config!");
+                throw new Exception("Voice chat audio clip frame length does not match the config!");
             }
 
-            audioClip.SetData(segment, config.general.samplesPerFrame * offsetSegments);
+            audioClip.SetData(frame, config.general.samplesPerFrame * offsetFrames);
         }
 
-        public int GetOffsetSegments(int segmentIndex)
+        public int GetOffsetFrames(int frameIndex)
         {
-            return segmentIndex % config.OutputSegmentCount;
+            return frameIndex % config.OutputSegmentCount;
         }
 
-        public void ClearSegment(int offsetSegments)
+        public void ClearFrame(int offsetFrames)
         {
-            audioClip.SetData(emptyFrame, config.general.samplesPerFrame * offsetSegments);
+            audioClip.SetData(emptyFrame, config.general.samplesPerFrame * offsetFrames);
         }
 
         public void Clear()

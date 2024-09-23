@@ -7,10 +7,6 @@
 // This was created by Connor Myers (Metater):
 // https://github.com/Metater
 
-// Take the following steps to adapt this to your own project:
-// 1. Ensure you have the MetaRefs project accessible to this.
-// 2. Ensure you have the MetaUtils project accessible to this.
-
 // Known issues:
 // 1:
 // High contigious packet loss and/or a momentary high jitter causes
@@ -50,15 +46,10 @@
 // Also, change the config output segment range to a plus or minus value. Just use plus or minus one segment, +- 25ms???
 // Then set pitch equal to one while in this range, else use P controller to adjust
 
-// Make a standalone version that doesn't have any dependencies
-// But, have R3MetaVc and R3VcAudioProcessor with SerializableReactiveProperties
-
 // If this becomes popular you could make a version where you implement MetaVc for your target networking library and don't depend on Mirror
 // Support NGO?
 
 // Post on reddit and mirror discord to advertise
-
-// TODO You might want to switch from 25ms segments to 20ms segments to better support opus
 
 // TODO FIX ISSUE WHERE YOU CANT SEND MORE THAN ONE PACKET PER FRAME, THIS IS VERY BAD, < 50 FPS MEANS TERRIBLE QUALITY
 
@@ -66,7 +57,6 @@
 // however this is extra complexity
 
 using System;
-using System.Buffers;
 using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.NetProviders;
@@ -82,66 +72,61 @@ namespace Assets.Metater.MetaVoiceChat
         /// <summary>
         /// This plays back the voice of the local player
         /// </summary>
-        public bool IsEchoEnabled { get; set; } = true;
+        public MetaSerializableReactiveProperty<bool> isEchoEnabled;
         /// <summary>
         /// This is the local player and they don't want to hear anyone else
         /// </summary>
-        public bool IsDeafened { get; set; }
+        public MetaSerializableReactiveProperty<bool> isDeafened;
         /// <summary>
         /// This is the local player and they don't want anyone to hear them
         /// </summary>
-        public bool IsInputMuted { get; set; }
+        public MetaSerializableReactiveProperty<bool> isInputMuted;
         /// <summary>
         /// This is a remote player that the local player doesn't want to hear
         /// </summary>
-        public bool IsOutputMuted { get; set; }
+        public MetaSerializableReactiveProperty<bool> isOutputMuted;
         /// <summary>
         /// This is the local player and they are speaking
         /// </summary>
-        public bool IsSpeaking { get; set; }
+        public MetaSerializableReactiveProperty<bool> isSpeaking;
 
-        public INetProvider VcImpl { get; set; }
+        private INetProvider netProvider;
 
-        public bool IsLocalPlayer { get; private set; }
+        private bool isLocalPlayer;
 
-        public AudioListener AudioListener { get; private set; }
+        private VcEncoder encoder;
+        private VcDecoder decoder;
 
-        public VcEncoder Encoder { get; private set; }
-        public VcDecoder Decoder { get; private set; }
+        private VcLocalJitter localJitter;
+        private VcRemoteJitter remoteJitter;
 
-        public VcLocalJitter LocalJitter { get; private set; }
-        public VcRemoteJitter RemoteJitter { get; private set; }
+        private VcAudioInput audioInput;
+        private VcAudioOutput audioOutput;
 
-        public VcAudioInput AudioInput { get; private set; }
-        public VcAudioOutput AudioOutput { get; private set; }
-
-        public void StartClient(INetProvider vcImpl, bool isLocalPlayer, int maxDataBytesPerPacket)
+        public void StartClient(INetProvider netProvider, bool isLocalPlayer, int maxDataBytesPerPacket)
         {
-            config.general.Cache(config, this);
-            config.general.outputAudioSource.dopplerLevel = 0;
+            config.general.Init(config, this);
 
-            VcImpl = vcImpl;
+            this.netProvider = netProvider;
 
-            IsLocalPlayer = isLocalPlayer;
-
-            AudioListener = FindObjectOfType<AudioListener>();
+            this.isLocalPlayer = isLocalPlayer;
 
             if (isLocalPlayer)
             {
-                Encoder = new(config, maxDataBytesPerPacket);
+                encoder = new(config, maxDataBytesPerPacket);
 
-                LocalJitter = new();
+                localJitter = new();
 
-                AudioInput = new(config);
-                AudioInput.OnFrameReady += SendFrame;
+                audioInput = new(config);
+                audioInput.OnFrameReady += SendFrame;
             }
 
-            Decoder = new(config);
+            decoder = new(config);
 
             // TODO Make settings configurable, also 1 second window is too big, maybe 100ms
-            RemoteJitter = new(1, 0);
+            remoteJitter = new(1, 0);
 
-            AudioOutput = new(config);
+            audioOutput = new(config);
         }
 
         private void SendFrame(int index, float[] samples)
@@ -156,31 +141,31 @@ namespace Assets.Metater.MetaVoiceChat
 
             bool isSpeaking = samples != null;
 
-            IsSpeaking = isSpeaking;
+            this.isSpeaking.Value = isSpeaking;
 
-            bool shouldRelayEmpty = !isSpeaking || IsDeafened || IsInputMuted;
+            bool shouldRelayEmpty = !isSpeaking || isDeafened || isInputMuted;
             if (shouldRelayEmpty)
             {
-                var timestamp = LocalJitter.Timestamp;
+                var timestamp = localJitter.Timestamp;
 
-                if (IsEchoEnabled)
+                if (isEchoEnabled)
                 {
                     ReceiveFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
                 }
 
-                VcImpl.RelayFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
+                netProvider.RelayFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
             }
             else
             {
-                var timestamp = LocalJitter.Timestamp;
-                var data = Encoder.EncodeFrame(samples.AsSpan());
+                var timestamp = localJitter.Timestamp;
+                var data = encoder.EncodeFrame(samples.AsSpan());
 
-                if (IsEchoEnabled)
+                if (isEchoEnabled)
                 {
                     ReceiveFrame(index, timestamp, data);
                 }
 
-                VcImpl.RelayFrame(index, LocalJitter.Timestamp, data);
+                netProvider.RelayFrame(index, localJitter.Timestamp, data);
             }
         }
 
@@ -189,25 +174,24 @@ namespace Assets.Metater.MetaVoiceChat
             if (data.Length == 0)
             {
                 SetIsSpeaking(false);
-                AudioOutput.FeedSegment(index);
+                audioOutput.FeedFrame(index);
 
                 //float jitter = RemoteJitter.Update(time);
             }
             else
             {
                 SetIsSpeaking(true);
-                if (VcImpl.IsLocalPlayerDeafened || IsOutputMuted)
+                if (netProvider.IsLocalPlayerDeafened || isOutputMuted)
                 {
-                    AudioOutput.FeedSegment(index);
+                    audioOutput.FeedFrame(index);
                 }
                 else
                 {
-                    var samples = Decoder.DecodeFrame(data);
-                    // TODO ARRAY LENGTH IS GREATER THAN OR EQUAL TO THE SIZE
-                    var array = ArrayPool<float>.Shared.Rent(samples.Length);
+                    var samples = decoder.DecodeFrame(data);
+                    var array = FixedLengthArrayPool<float>.Rent(samples.Length);
                     samples.CopyTo(array);
-                    AudioOutput.FeedSegment(index, array);
-                    ArrayPool<float>.Shared.Return(array);
+                    audioOutput.FeedFrame(index, array);
+                    FixedLengthArrayPool<float>.Return(array);
                 }
 
                 //float jitter = RemoteJitter.Update(time);
@@ -216,23 +200,27 @@ namespace Assets.Metater.MetaVoiceChat
 
         public void StopClient()
         {
-            if (AudioInput != null)
+            if (isLocalPlayer)
             {
-                AudioInput.OnFrameReady -= SendFrame;
-                AudioInput.Dispose();
+                encoder.Dispose();
+
+                audioInput.OnFrameReady -= SendFrame;
+                audioInput.Dispose();
             }
 
-            AudioOutput?.Dispose();
+            decoder.Dispose();
+
+            audioOutput.Dispose();
         }
 
         private void SetIsSpeaking(bool value)
         {
-            if (IsEchoEnabled && IsLocalPlayer)
+            if (isEchoEnabled && isLocalPlayer)
             {
                 return;
             }
 
-            IsSpeaking = value;
+            isSpeaking.Value = value;
         }
     }
 }

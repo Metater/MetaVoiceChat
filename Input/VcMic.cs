@@ -9,7 +9,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
 {
     public class VcMic : IDisposable
     {
-        public readonly VcConfig config;
+        private readonly VcConfig config;
 
         public bool IsRecording { get; private set; } = false;
 
@@ -30,12 +30,12 @@ namespace Assets.Metater.MetaVoiceChat.Input
             }
         }
 
-        private int nextSegmentIndex = 0;
-        private int NextSegmentIndex => nextSegmentIndex++;
+        private int nextFrameIndex = 0;
+        private int NextFrameIndex => nextFrameIndex++;
 
         private Coroutine recordCoroutine;
 
-        public event Action<int, float[]> OnSegmentReady;
+        public event Action<int, float[]> OnFrameReady;
 
         public VcMic(VcConfig config)
         {
@@ -112,7 +112,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
             int loops = 0;
             int readAbsPos = 0;
             int prevPos = 0;
-            float[] segment = new float[config.general.samplesPerFrame];
+            float[] samples = new float[config.general.samplesPerFrame];
 
             while (AudioClip != null && Microphone.IsRecording(CurrentDeviceName))
             {
@@ -129,14 +129,20 @@ namespace Assets.Metater.MetaVoiceChat.Input
                     prevPos = currPos;
 
                     int currAbsPos = loops * AudioClip.samples + currPos;
-                    int nextReadAbsPos = readAbsPos + segment.Length;
+                    int nextReadAbsPos = readAbsPos + samples.Length;
 
                     if (nextReadAbsPos < currAbsPos)
                     {
-                        int offset = readAbsPos % AudioClip.samples;
-                        AudioClip.GetData(segment, offset);
+                        int offsetSamples = readAbsPos % AudioClip.samples;
+                        AudioClip.GetData(samples, offsetSamples);
 
-                        OnSegmentReady?.Invoke(NextSegmentIndex, segment);
+                        int frameIndex = NextFrameIndex;
+                        OnFrameReady?.Invoke(frameIndex, samples);
+
+                        //if (samples.Max(s => Mathf.Abs(s)) > 0.5f)
+                        //{
+                        //    Debug.Log($"MIC - Frame: {Time.frameCount}, Offset: {frameIndex % config.OutputSegmentCount}, Time: {Time.realtimeSinceStartupAsDouble}");
+                        //}
 
                         readAbsPos = nextReadAbsPos;
                         isNewDataAvailable = true;

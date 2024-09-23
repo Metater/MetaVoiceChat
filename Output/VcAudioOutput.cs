@@ -16,11 +16,11 @@ namespace Assets.Metater.MetaVoiceChat.Output
         private readonly int[] clipSegmentIndicies;
         private readonly Coroutine updateCoroutine;
 
-        private int firstSegmentIndex = -1;
-        private int greatestSegmentIndex = -1;
+        private int firstFrameIndex = -1;
+        private int greatestFrameIndex = -1;
 
-        private readonly System.Diagnostics.Stopwatch segmentStopwatch = new();
-        private float TimeSinceSegment => (float)segmentStopwatch.Elapsed.TotalSeconds;
+        private readonly System.Diagnostics.Stopwatch frameStopwatch = new();
+        private float TimeSinceSegment => (float)frameStopwatch.Elapsed.TotalSeconds;
 
         private readonly MetaCsv csv = new("Time", "Error");
 
@@ -44,13 +44,13 @@ namespace Assets.Metater.MetaVoiceChat.Output
             while (true)
             {
                 int receivedSegments;
-                if (greatestSegmentIndex == -1)
+                if (greatestFrameIndex == -1)
                 {
                     receivedSegments = 0;
                 }
                 else
                 {
-                    receivedSegments = greatestSegmentIndex - firstSegmentIndex + 1;
+                    receivedSegments = greatestFrameIndex - firstFrameIndex + 1;
 
                     // Build up buffer extra before starting output
                     //receivedSegments -= 2;
@@ -66,7 +66,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
                     float targetLatency = (float)config.OutputLagSegmentsTarget / config.general.framesPerSecond;
                     if (timeSinceFirstSegment >= targetLatency)
                     {
-                        audioSource.time = GetWrappedTime(firstSegmentIndex);
+                        audioSource.time = GetWrappedTime(firstFrameIndex);
                         audioSource.Play();
                         break;
                     }
@@ -130,6 +130,9 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
                 ClearOldSegments();
 
+                //var readOffsetSegments = audioSource.timeSamples / config.general.samplesPerFrame;
+                //Debug.Log($"OUT - Frame: {Time.frameCount}, Offset: {readOffsetSegments}, Time: {Time.realtimeSinceStartupAsDouble}");
+
                 yield return null;
             }
         }
@@ -141,10 +144,10 @@ namespace Assets.Metater.MetaVoiceChat.Output
                 int segmentIndex = clipSegmentIndicies[i];
                 if (segmentIndex != -1)
                 {
-                    int age = greatestSegmentIndex - segmentIndex;
+                    int age = greatestFrameIndex - segmentIndex;
                     if (age > config.OutputSegmentLifetime)
                     {
-                        vcAudioClip.ClearSegment(i);
+                        vcAudioClip.ClearFrame(i);
                         clipSegmentIndicies[i] = -1;
                     }
                 }
@@ -181,7 +184,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
         private float GetRawLatency()
         {
-            float writeTime = GetWrappedTime(greatestSegmentIndex);
+            float writeTime = GetWrappedTime(greatestFrameIndex);
             float readTime = audioSource.time;
             float latency = writeTime - readTime;
             float clipLength = vcAudioClip.Length;
@@ -201,26 +204,26 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
         private float GetWrappedTime(int segmentIndex)
         {
-            return (float)vcAudioClip.GetOffsetSegments(segmentIndex) * config.general.framePeriodMs / 1000f;
+            return (float)vcAudioClip.GetOffsetFrames(segmentIndex) * config.general.framePeriodMs / 1000f;
         }
 
-        public void FeedSegment(int segmentIndex, float[] segment = null)
+        public void FeedFrame(int frameIndex, float[] samples = null)
         {
-            int offsetSegments = vcAudioClip.GetOffsetSegments(segmentIndex);
-            vcAudioClip.WriteSegment(offsetSegments, segment);
-            clipSegmentIndicies[offsetSegments] = segmentIndex;
+            int offsetFrames = vcAudioClip.GetOffsetFrames(frameIndex);
+            vcAudioClip.WriteFrame(offsetFrames, samples);
+            clipSegmentIndicies[offsetFrames] = frameIndex;
 
-            if (firstSegmentIndex == -1)
+            if (firstFrameIndex == -1)
             {
-                firstSegmentIndex = segmentIndex;
+                firstFrameIndex = frameIndex;
             }
 
-            if (segmentIndex > greatestSegmentIndex)
+            if (frameIndex > greatestFrameIndex)
             {
-                greatestSegmentIndex = segmentIndex;
+                greatestFrameIndex = frameIndex;
             }
 
-            segmentStopwatch.Restart();
+            frameStopwatch.Restart();
         }
 
         public void Dispose()

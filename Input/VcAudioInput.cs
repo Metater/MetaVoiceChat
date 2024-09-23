@@ -7,67 +7,30 @@ namespace Assets.Metater.MetaVoiceChat.Input
     public class VcAudioInput : IDisposable
     {
         public readonly VcConfig config;
-        public readonly VcAudioProcessor processor;
+        public readonly VcInputFilter inputFilter;
         public readonly VcMic mic;
 
         public event Action<int, float[]> OnFrameReady;
 
-        //private double lastDetectionSeconds = double.MinValue;
-
         public VcAudioInput(VcConfig config)
         {
             this.config = config;
-            processor = config.general.audioProcessor;
+            inputFilter = config.general.inputFilter;
 
             mic = new(config);
             mic.StartRecording();
-            mic.OnSegmentReady += Mic_OnSegmentReady;
+            mic.OnFrameReady += Mic_OnFrameReady;
         }
 
-        private void Mic_OnSegmentReady(int segmentIndex, float[] segment)
+        private void Mic_OnFrameReady(int frameIndex, float[] samples)
         {
-            //bool isVoiceDetected = DetectVoice(segment);
-            //if (isVoiceDetected)
-            //{
-            //    lastDetectionSeconds = Meta.Realtime;
-            //}
-
-            //bool shouldSpeak = Meta.Realtime - config.DetectionLatchSeconds < lastDetectionSeconds;
-            //if (shouldSpeak)
-            //{
-            OnFrameReady?.Invoke(segmentIndex, segment);
-            //}
-            //else
-            //{
-            //    OnSegmentReady?.Invoke(segmentIndex, null);
-            //}
+            inputFilter.Filter(ref samples);
+            OnFrameReady?.Invoke(frameIndex, samples);
         }
-
-        //private bool DetectVoice(float[] segment)
-        //{
-        //    float percentage = GetPercentageAboveThreshold(segment);
-        //    return percentage > config.DetectionPercentage;
-        //}
-
-        //private float GetPercentageAboveThreshold(float[] segment)
-        //{
-        //    float percentageIncrement = 1f / segment.Length;
-        //    float percentage = 0;
-        //    float detectionValue = config.DetectionValue;
-        //    foreach (float value in segment)
-        //    {
-        //        if (Math.Abs(value) > detectionValue)
-        //        {
-        //            percentage += percentageIncrement;
-        //        }
-        //    }
-
-        //    return percentage;
-        //}
 
         public void Dispose()
         {
-            mic.OnSegmentReady -= Mic_OnSegmentReady;
+            mic.OnFrameReady -= Mic_OnFrameReady;
             mic.Dispose();
         }
     }

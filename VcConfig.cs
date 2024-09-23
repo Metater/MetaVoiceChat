@@ -62,7 +62,7 @@ namespace Assets.Metater.MetaVoiceChat
         [Serializable]
         public class GeneralConfig
         {
-            public VcAudioProcessor audioProcessor;
+            public VcInputFilter inputFilter;
             public AudioSource outputAudioSource;
 
             [NonSerialized] public int framePeriodMs;
@@ -70,8 +70,10 @@ namespace Assets.Metater.MetaVoiceChat
             [NonSerialized] public int samplesPerFrame;
             [NonSerialized] public MonoBehaviour coroutineProvider;
 
-            public void Cache(VcConfig config, MonoBehaviour coroutineProvider)
+            public void Init(VcConfig config, MonoBehaviour coroutineProvider)
             {
+                outputAudioSource.dopplerLevel = 0;
+
                 framePeriodMs = config.opus.framesize switch
                 {
                     OpusFramesize.OPUS_FRAMESIZE_2_5_MS => throw new NotSupportedException("2.5ms Opus framesize not supported."),
