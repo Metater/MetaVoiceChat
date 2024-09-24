@@ -25,18 +25,6 @@
     public double slowdownSpeed = 0.04f; // slow down a little faster so we don't encounter empty buffer (= jitter)
 */
 
-// Missing functionality:
-// 1:
-// Spacial audio controls, i.e. muting of a player's mouth after a certain distance
-// 2:
-// Audio encoding, probably Opus
-// 3:
-// Support for only single channel microphones.
-// Unity's Microphone class may be limited to only one, not sure
-
-// TODO Spacial cuttoff, use logorithmic dropoff, send empty segments when out of range
-// ^^^^^^ JUST USE THE OUTPUT AUDIO SOURCE 3D MAX DISTANCE
-
 // Use a timer for MetaVcs with output enabled to request the time from the player that is speaking to this MetaVc output
 // Use the sent back time and the current time to calculate instantaneous jitter
 // Perhaps use Exponential moving average on the jitter or just average it over the past second
@@ -56,17 +44,22 @@
 // MirrorVcManager could be created to handle all of the networking in a single place and to batch frames with the same timestamp sending from the server to clients,
 // however this is extra complexity
 
+// TODO Test with low frame rates
+
 using System;
-using Assets.Metater.MetaVoiceChat.General;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.NetProviders;
+using Assets.Metater.MetaVoiceChat.Opus;
 using Assets.Metater.MetaVoiceChat.Output;
+using Assets.Metater.MetaVoiceChat.Utils;
 using UnityEngine;
 
 namespace Assets.Metater.MetaVoiceChat
 {
     public class MetaVc : MonoBehaviour
     {
+        public VcAudioInput audioInput;
+        public VcAudioOutput audioOutput;
         public VcConfig config;
 
         /// <summary>
@@ -100,12 +93,9 @@ namespace Assets.Metater.MetaVoiceChat
         private VcLocalJitter localJitter;
         private VcRemoteJitter remoteJitter;
 
-        private VcAudioInput audioInput;
-        private VcAudioOutput audioOutput;
-
         public void StartClient(INetProvider netProvider, bool isLocalPlayer, int maxDataBytesPerPacket)
         {
-            config.general.Init(config, this);
+            config.Init();
 
             this.netProvider = netProvider;
 
@@ -117,7 +107,6 @@ namespace Assets.Metater.MetaVoiceChat
 
                 localJitter = new();
 
-                audioInput = new(config);
                 audioInput.OnFrameReady += SendFrame;
             }
 
@@ -125,8 +114,6 @@ namespace Assets.Metater.MetaVoiceChat
 
             // TODO Make settings configurable, also 1 second window is too big, maybe 100ms
             remoteJitter = new(1, 0);
-
-            audioOutput = new(config);
         }
 
         private void SendFrame(int index, float[] samples)
@@ -174,7 +161,7 @@ namespace Assets.Metater.MetaVoiceChat
             if (data.Length == 0)
             {
                 SetIsSpeaking(false);
-                audioOutput.FeedFrame(index);
+                audioOutput.ReceiveFrame(index, null, /* TODODOODODODO */ 0);
 
                 //float jitter = RemoteJitter.Update(time);
             }
@@ -183,15 +170,23 @@ namespace Assets.Metater.MetaVoiceChat
                 SetIsSpeaking(true);
                 if (netProvider.IsLocalPlayerDeafened || isOutputMuted)
                 {
-                    audioOutput.FeedFrame(index);
+                    audioOutput.ReceiveFrame(index, null, /* TODODOODODODO */ 0);
                 }
                 else
                 {
                     var samples = decoder.DecodeFrame(data);
-                    var array = FixedLengthArrayPool<float>.Rent(samples.Length);
-                    samples.CopyTo(array);
-                    audioOutput.FeedFrame(index, array);
-                    FixedLengthArrayPool<float>.Return(array);
+                    if (samples.Length == config.samplesPerFrame)
+                    {
+                        var array = FixedLengthArrayPool<float>.Rent(samples.Length);
+                        samples.CopyTo(array);
+                        audioOutput.ReceiveFrame(index, array, /* TODODOODODODO */ 0);
+                        FixedLengthArrayPool<float>.Return(array);
+                    }
+                    else
+                    {
+                        // Silently ignore the frame with invalid length
+                        audioOutput.ReceiveFrame(index, null,  /* TODODOODODODO */ 0);
+                    }
                 }
 
                 //float jitter = RemoteJitter.Update(time);
@@ -205,12 +200,9 @@ namespace Assets.Metater.MetaVoiceChat
                 encoder.Dispose();
 
                 audioInput.OnFrameReady -= SendFrame;
-                audioInput.Dispose();
             }
 
             decoder.Dispose();
-
-            audioOutput.Dispose();
         }
 
         private void SetIsSpeaking(bool value)

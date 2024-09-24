@@ -3,12 +3,12 @@
 using System;
 using UnityEngine;
 
-namespace Assets.Metater.MetaVoiceChat.Output
+namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 {
     public class VcAudioClip : IDisposable
     {
-        private readonly VcConfig config;
-
+        private readonly int samplesPerFrame;
+        private readonly int framesPerClip;
         private readonly AudioClip audioClip;
 
         private readonly float[] emptyFrame;
@@ -16,40 +16,41 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
         public float Length => audioClip.length;
 
-        public VcAudioClip(VcConfig config)
+        public VcAudioClip(int samplesPerFrame, int framesPerClip, UnityEngine.AudioSource audioSource)
         {
-            this.config = config;
+            this.samplesPerFrame = samplesPerFrame;
+            this.framesPerClip = framesPerClip;
 
-            audioClip = AudioClip.Create(nameof(VcAudioClip), config.OutputSampleCount, VcConfig.ChannelCount, VcConfig.SamplesPerSecond, false);
+            audioClip = AudioClip.Create(nameof(VcAudioClip), VcConfig.SamplesPerClip, channels: 1, VcConfig.SamplesPerSecond, false);
 
-            emptyFrame = new float[config.general.samplesPerFrame];
-            emptyClip = new float[config.OutputSampleCount];
+            emptyFrame = new float[samplesPerFrame];
+            emptyClip = new float[VcConfig.SamplesPerClip];
 
-            var audioSource = config.general.outputAudioSource;
             audioSource.loop = true;
             audioSource.clip = audioClip;
         }
 
-        public void WriteFrame(int offsetFrames, float[] frame)
+        public void WriteFrame(int offsetFrames, float[] samples)
         {
-            frame ??= emptyFrame;
+            samples ??= emptyFrame;
 
-            if (frame.Length != config.general.samplesPerFrame)
+            if (samples.Length != samplesPerFrame)
             {
                 throw new Exception("Voice chat audio clip frame length does not match the config!");
             }
 
-            audioClip.SetData(frame, config.general.samplesPerFrame * offsetFrames);
+            int offsetSamples = samplesPerFrame * offsetFrames;
+            audioClip.SetData(samples, offsetSamples);
         }
 
         public int GetOffsetFrames(int frameIndex)
         {
-            return frameIndex % config.OutputSegmentCount;
+            return frameIndex % framesPerClip;
         }
 
         public void ClearFrame(int offsetFrames)
         {
-            audioClip.SetData(emptyFrame, config.general.samplesPerFrame * offsetFrames);
+            audioClip.SetData(emptyFrame, samplesPerFrame * offsetFrames);
         }
 
         public void Clear()

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Assets.Metater.MetaVoiceChat.General
+namespace Assets.Metater.MetaVoiceChat.Utils
 {
     public static class FixedLengthArrayPool<T>
     {

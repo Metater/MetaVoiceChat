@@ -5,11 +5,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Assets.Metater.MetaVoiceChat.Input
+// Do device list changes at runtime cause any bugs?
+
+namespace Assets.Metater.MetaVoiceChat.Input.Mic
 {
     public class VcMic : IDisposable
     {
-        private readonly VcConfig config;
+        private readonly MonoBehaviour coroutineProvider;
+        private readonly int samplesPerFrame;
 
         public bool IsRecording { get; private set; } = false;
 
@@ -23,7 +26,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
             {
                 if (CurrentDeviceIndex < 0 || CurrentDeviceIndex >= Devices.Count)
                 {
-                    return string.Empty;
+                    return "";
                 }
 
                 return Devices[CurrentDeviceIndex];
@@ -37,9 +40,10 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
         public event Action<int, float[]> OnFrameReady;
 
-        public VcMic(VcConfig config)
+        public VcMic(MonoBehaviour coroutineProvider, int samplesPerFrame)
         {
-            this.config = config;
+            this.coroutineProvider = coroutineProvider;
+            this.samplesPerFrame = samplesPerFrame;
         }
 
         public void SetDeviceIndex(int index)
@@ -61,10 +65,10 @@ namespace Assets.Metater.MetaVoiceChat.Input
         {
             if (Devices.Count <= 0)
             {
-                throw new Exception("No voice chat microphone detected!");
+                throw new Exception("No microphone detected for voice chat!");
             }
 
-            if (CurrentDeviceIndex == -1 && Devices.Count > 0)
+            if (CurrentDeviceIndex < 0 || CurrentDeviceIndex >= Devices.Count)
             {
                 CurrentDeviceIndex = 0;
             }
@@ -76,22 +80,22 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
             if (AudioClip == null)
             {
-                throw new Exception("Voice chat microphone failed to start recording!");
+                throw new Exception("Microphone failed to start recording for voice chat!");
             }
 
             if (AudioClip.channels != 1)
             {
-                throw new Exception("Voice chat microphone must have exactly one channel!");
+                throw new Exception("Microphone must have exactly one channel for voice chat!");
             }
 
-            recordCoroutine = config.general.coroutineProvider.StartCoroutine(CoRecord());
+            recordCoroutine = coroutineProvider.StartCoroutine(CoRecord());
         }
 
         public void StopRecording()
         {
             if (recordCoroutine != null)
             {
-                config.general.coroutineProvider.StopCoroutine(recordCoroutine);
+                coroutineProvider.StopCoroutine(recordCoroutine);
                 recordCoroutine = null;
             }
 
@@ -109,10 +113,10 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
         private IEnumerator CoRecord()
         {
-            int loops = 0;
+            int i = 0;
             int readAbsPos = 0;
             int prevPos = 0;
-            float[] samples = new float[config.general.samplesPerFrame];
+            float[] samples = new float[samplesPerFrame];
 
             while (AudioClip != null && Microphone.IsRecording(CurrentDeviceName))
             {
@@ -123,12 +127,12 @@ namespace Assets.Metater.MetaVoiceChat.Input
                     int currPos = Microphone.GetPosition(CurrentDeviceName);
                     if (currPos < prevPos)
                     {
-                        loops++;
+                        i++;
                     }
 
                     prevPos = currPos;
 
-                    int currAbsPos = loops * AudioClip.samples + currPos;
+                    int currAbsPos = i * AudioClip.samples + currPos;
                     int nextReadAbsPos = readAbsPos + samples.Length;
 
                     if (nextReadAbsPos < currAbsPos)
@@ -138,11 +142,6 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
                         int frameIndex = NextFrameIndex;
                         OnFrameReady?.Invoke(frameIndex, samples);
-
-                        //if (samples.Max(s => Mathf.Abs(s)) > 0.5f)
-                        //{
-                        //    Debug.Log($"MIC - Frame: {Time.frameCount}, Offset: {frameIndex % config.OutputSegmentCount}, Time: {Time.realtimeSinceStartupAsDouble}");
-                        //}
 
                         readAbsPos = nextReadAbsPos;
                         isNewDataAvailable = true;

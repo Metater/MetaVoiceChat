@@ -1,7 +1,7 @@
 using System;
 using Concentus;
 
-namespace Assets.Metater.MetaVoiceChat.General
+namespace Assets.Metater.MetaVoiceChat.Opus
 {
     public class VcDecoder : IDisposable
     {
@@ -12,11 +12,11 @@ namespace Assets.Metater.MetaVoiceChat.General
 
         public VcDecoder(VcConfig config)
         {
-            opusDecoder = OpusCodecFactory.CreateDecoder(VcConfig.SamplesPerSecond, VcConfig.ChannelCount);
+            opusDecoder = OpusCodecFactory.CreateDecoder(VcConfig.SamplesPerSecond, numChannels: 1);
 
             //opusDecoder.Gain
 
-            buffer = new float[config.general.samplesPerFrame];
+            buffer = new float[config.samplesPerFrame];
         }
 
         public ReadOnlySpan<float> DecodeFrame(ReadOnlySpan<byte> data, bool decodeFec = false)

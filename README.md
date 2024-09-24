@@ -10,12 +10,13 @@ TODO
 
 ## Features
 - No code required
+- No complicated cloud services required
 - Many configurable settings
 - Voice activation detection and latching
 - Pooled data buffers with no runtime allocat6ion
 - 16-bit PCM audio
 - "ECHO" compilation symbol to playback your own voice when testing
-- Functionality and events ([R3](https://github.com/Cysharp/R3) implementation) for
+- Functionality and events for
     - Speaking
     - Deafening yourself
     - Input muting yourself
@@ -26,6 +27,7 @@ TODO
     - Variable bitrate encoding
     - Many exposed settings
 - TODO FILL IN OTHER FEATURES
+- TODO Set default values for everything
 
 ### Planned Features
 - Opus audio encoding
@@ -71,6 +73,12 @@ TODO
     - Opus features
         - Forward error correction
     - Multiple chat rooms
+
+## Tips
+- Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"
+
+## Questions
+- Should code fail without throwing exceptions? Should silent failure be an option? E.g. VcMicAudioInput throws sometimes.
 
 ## License
 This project is licensed under the [MIT License](LICENSE)

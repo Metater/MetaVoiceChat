@@ -3,7 +3,18 @@ using Assets.Metater.MetaUtils;
 using UnityEngine;
 using UnityEngine.Audio;
 
-namespace Assets.Metater.MetaVoiceChat
+// Future inspiration for how to do detection: https://github.com/alphacep/vosk-unity-asr/blob/master/Assets/Scripts/VoiceProcessor.cs
+
+//[Header("Detection")]
+//[SerializeField] private float detectionValue = 0.002f;
+//[SerializeField] private float detectionPercentage = 0.05f;
+//[SerializeField] private float detectionLatchSeconds = 0.1f;
+
+//public float DetectionValue => detectionValue;
+//public float DetectionPercentage => detectionPercentage;
+//public float DetectionLatchSeconds => detectionLatchSeconds;
+
+namespace Assets.Metater.MetaVoiceChat.Input
 {
     public class VcInputFilter : MonoBehaviour
     {

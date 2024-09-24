@@ -1,7 +1,7 @@
 #if MIRROR
 using System;
 using System.Collections.Generic;
-using Assets.Metater.MetaVoiceChat.General;
+using Assets.Metater.MetaVoiceChat.Utils;
 using Mirror;
 using UnityEngine;
 
@@ -18,12 +18,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 
         bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.metaVc.isDeafened;
 
-        private MetaVc metaVc;
-
-        private void Awake()
-        {
-            metaVc = GetComponent<MetaVc>();
-        }
+        public MetaVc metaVc;
 
         public override void OnStartClient()
         {

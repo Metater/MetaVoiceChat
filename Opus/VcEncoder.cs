@@ -11,7 +11,7 @@ using Concentus;
 
 // Raw bitrate without encoding = 16 bits * 16000 Hz = 256000
 
-namespace Assets.Metater.MetaVoiceChat.General
+namespace Assets.Metater.MetaVoiceChat.Opus
 {
     public class VcEncoder : IDisposable
     {
@@ -26,27 +26,27 @@ namespace Assets.Metater.MetaVoiceChat.General
             // 1275 is the maximum packet size for Opus
             maxDataBytesPerPacket = Math.Min(maxDataBytesPerPacket, 1275);
 
-            opusEncoder = OpusCodecFactory.CreateEncoder(VcConfig.SamplesPerSecond, VcConfig.ChannelCount, config.opus.application);
+            opusEncoder = OpusCodecFactory.CreateEncoder(VcConfig.SamplesPerSecond, numChannels: 1, config.application);
 
-            opusEncoder.Bandwidth = VcConfig.OpusConfig.Bandwidth;
+            opusEncoder.Bandwidth = VcConfig.Bandwidth;
             //opusEncoder.Bitrate
-            opusEncoder.Complexity = config.opus.complexity;
+            opusEncoder.Complexity = config.complexity;
             //opusEncoder.ExpertFrameDuration
             //opusEncoder.FinalRange
             //opusEncoder.ForceChannels
-            opusEncoder.ForceMode = VcConfig.OpusConfig.Mode;
+            opusEncoder.ForceMode = VcConfig.Mode;
             opusEncoder.LSBDepth = VcConfig.BitsPerSample;
-            opusEncoder.MaxBandwidth = VcConfig.OpusConfig.MaxBandwidth;
+            opusEncoder.MaxBandwidth = VcConfig.MaxBandwidth;
             //opusEncoder.PacketLossPercent
             //opusEncoder.PredictionDisabled
-            opusEncoder.SignalType = config.opus.signal;
+            opusEncoder.SignalType = config.signal;
             //opusEncoder.UseConstrainedVBR
             //opusEncoder.UseDTX
             //opusEncoder.UseInbandFEC = true;
             //opusEncoder.UseVBR
 
             buffer = new byte[maxDataBytesPerPacket];
-            frameSize = config.general.samplesPerFrame;
+            frameSize = config.samplesPerFrame;
         }
 
         public ReadOnlySpan<byte> EncodeFrame(ReadOnlySpan<float> samples)
