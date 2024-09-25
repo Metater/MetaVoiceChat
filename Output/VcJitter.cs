@@ -7,7 +7,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
     public class VcJitter
     {
         private readonly double window;
-        private readonly float defaultJitter;
+        private readonly float jitterDefault;
 
         private readonly System.Diagnostics.Stopwatch stopwatch = new();
         private float TimeSincePreviousUpdate => (float)stopwatch.Elapsed.TotalSeconds;
@@ -18,8 +18,8 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
         public VcJitter(VcConfig config)
         {
-            this.window = window;
-            this.defaultJitter = defaultJitter;
+            window = config.jitterWindow;
+            jitterDefault = config.jitterDefault;
         }
 
         public float Update(double timestamp)
@@ -28,7 +28,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
             {
                 stopwatch.Restart();
                 previousTimestamp = timestamp;
-                return defaultJitter;
+                return jitterDefault;
             }
 
             float diff = (float)(timestamp - previousTimestamp) - TimeSincePreviousUpdate;
@@ -54,7 +54,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
                 return rmsJitter;
             }
 
-            return defaultJitter;
+            return jitterDefault;
         }
 
         private void RemoveOldDiffs(double timestamp)

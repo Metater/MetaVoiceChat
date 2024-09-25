@@ -13,8 +13,9 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
         public float frameLifetimeSeconds = 0.5f;
         [Tooltip("The maximum negative latency allowed before pausing the audio source to rebuild the buffer.")]
         public float maxNegativeLatency = 0.25f;
-        [Tooltip("The proportional gain of the pitch controller. Units are percent per second of latency error.")]
+        [Tooltip("The proportional gain of the pitch controller. The units are percent per second of latency error.")]
         public float pitchProportionalGain = 1;
+        //[Range(0, 0.05f)] public float targetLatencyOverride;
 
         private int framesPerSecond;
         private float secondsPerFrame;
@@ -30,10 +31,14 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
         private bool isInit = false;
 
+        private float targetLatency;
+
         private readonly MetaCsv csv = new("Time", "Error");
+        private readonly MetaCsv latencyCsv = new("Time", "Latency");
 
         private void Start()
         {
+            // Unity implements doppler by changing the pitch of the audio clip. This interferes with our purposes.
             audioSource.dopplerLevel = 0;
 
             var config = metaVc.config;
@@ -50,8 +55,10 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
         private void Update()
         {
-            const float targetLatency = 0.125f; // TODO USE targetLatency
+            //print(targetLatency);
+            //targetLatency = targetLatencyOverride;
 
+            // Build up the buffer until the target latency is reached and start playing at the correct clip time
             if (!isInit)
             {
                 int receivedFrames;
@@ -62,13 +69,6 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
                 else
                 {
                     receivedFrames = greatestFrameIndex - firstFrameIndex + 1;
-
-                    // Build up buffer extra before starting output
-                    //receivedFrames -= 2;
-                    //if (receivedFrames < 0)
-                    //{
-                    //    receivedFrames = 0;
-                    //}
                 }
 
                 if (receivedFrames != 0)
@@ -89,6 +89,8 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
             }
 
             float latency = GetLatency();
+
+            latencyCsv.AddRow(Time.time, targetLatency * 1000);
 
             // Pause while latency is negative, rebuild the buffer
             if (latency < 0)
@@ -190,6 +192,8 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
         public override void ReceiveFrame(int index, float[] samples, float targetLatency)
         {
+            this.targetLatency = targetLatency;
+
             int offsetFrames = vcAudioClip.GetOffsetFrames(index);
             vcAudioClip.WriteFrame(offsetFrames, samples);
             clipFrameIndicies[offsetFrames] = index;
@@ -212,6 +216,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
             vcAudioClip.Dispose();
 
             csv.Dispose();
+            latencyCsv.Dispose();
         }
     }
 }

@@ -46,6 +46,8 @@
 
 // TODO Test with low video frame rates
 
+// TODO Determine the minimum follow latency
+
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.NetProviders;
@@ -106,19 +108,18 @@ namespace Assets.Metater.MetaVoiceChat
 
             decoder = new(config);
 
-            // TODO Make settings configurable, also 1 second window is too big, maybe 100ms
-            jitter = new(1, 0);
+            jitter = new(config);
 
             stopwatch.Restart();
         }
 
         private void SendFrame(int index, float[] samples)
         {
-            //if (segment != null)
+            //if (samples != null)
             //{
-            //    for (int i = 0; i < segment.Length; i++)
+            //    for (int i = 0; i < samples.Length; i++)
             //    {
-            //        segment[i] = 0.2f * Mathf.Sin(Mathf.PI * i * (1.0f / 40.0f));
+            //        samples[i] = 0.2f * Mathf.Sin(Mathf.PI * i * (1.0f / 40.0f));
             //    }
             //}
 
@@ -129,44 +130,55 @@ namespace Assets.Metater.MetaVoiceChat
             bool shouldRelayEmpty = !isSpeaking || isDeafened || isInputMuted;
             if (shouldRelayEmpty)
             {
-                var timestamp = localJitter.Timestamp;
-
                 if (isEchoEnabled)
                 {
-                    ReceiveFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
+                    ReceiveFrame(index, Timestamp, ReadOnlySpan<byte>.Empty);
                 }
 
-                netProvider.RelayFrame(index, timestamp, ReadOnlySpan<byte>.Empty);
+                netProvider.RelayFrame(index, Timestamp, ReadOnlySpan<byte>.Empty);
             }
             else
             {
-                var timestamp = localJitter.Timestamp;
                 var data = encoder.EncodeFrame(samples.AsSpan());
 
                 if (isEchoEnabled)
                 {
-                    ReceiveFrame(index, timestamp, data);
+                    ReceiveFrame(index, Timestamp, data);
                 }
 
-                netProvider.RelayFrame(index, localJitter.Timestamp, data);
+                netProvider.RelayFrame(index, Timestamp, data);
             }
         }
 
         public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
+            // TODO Use exponential backoff. Is the jitter stuff even needed?
+
+            float targetLatency;
+            if (isLocalPlayer)
+            {
+                // TODO Make this constant a variable?
+                targetLatency = 0.027f;
+            }
+            else
+            {
+                float jitter = this.jitter.Update(timestamp);
+                targetLatency = Mathf.Max(jitter, 0.032f); // 40ms seemed to work, 27 ms occasional pauses
+            }
+
             if (data.Length == 0)
             {
                 SetIsSpeaking(false);
-                audioOutput.ReceiveFrame(index, null, /* TODODOODODODO */ 0);
 
-                //float jitter = RemoteJitter.Update(time);
+                audioOutput.ReceiveFrame(index, null, targetLatency);
             }
             else
             {
                 SetIsSpeaking(true);
+
                 if (netProvider.IsLocalPlayerDeafened || isOutputMuted)
                 {
-                    audioOutput.ReceiveFrame(index, null, /* TODODOODODODO */ 0);
+                    audioOutput.ReceiveFrame(index, null, targetLatency);
                 }
                 else
                 {
@@ -175,17 +187,15 @@ namespace Assets.Metater.MetaVoiceChat
                     {
                         var array = FixedLengthArrayPool<float>.Rent(samples.Length);
                         samples.CopyTo(array);
-                        audioOutput.ReceiveFrame(index, array, /* TODODOODODODO */ 0);
+                        audioOutput.ReceiveFrame(index, array, targetLatency);
                         FixedLengthArrayPool<float>.Return(array);
                     }
                     else
                     {
                         // Silently ignore the frame with invalid length
-                        audioOutput.ReceiveFrame(index, null,  /* TODODOODODODO */ 0);
+                        audioOutput.ReceiveFrame(index, null, targetLatency);
                     }
                 }
-
-                //float jitter = RemoteJitter.Update(time);
             }
         }
 
@@ -205,6 +215,7 @@ namespace Assets.Metater.MetaVoiceChat
         {
             if (isEchoEnabled && isLocalPlayer)
             {
+                // Return because isSpeaking is already set in SendFrame
                 return;
             }
 
