@@ -1,5 +1,5 @@
-# MetaVoiceChat
- 
+![MetaVoiceChat Banner](MetaVoiceChat.png)
+
 ## A simple and self-contained proximity voice chat solution for Unity's popular client-server networking libraries (currently only is Mirror supported*) with all of the features you need.
 &ast; Other libraries can easily be implemented by composing an agnostic MonoBehaviour — please feel free to contribute additional implementations.
 
