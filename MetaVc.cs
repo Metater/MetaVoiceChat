@@ -44,7 +44,7 @@
 // MirrorVcManager could be created to handle all of the networking in a single place and to batch frames with the same timestamp sending from the server to clients,
 // however this is extra complexity
 
-// TODO Test with low frame rates
+// TODO Test with low video frame rates
 
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
@@ -62,25 +62,15 @@ namespace Assets.Metater.MetaVoiceChat
         public VcAudioOutput audioOutput;
         public VcConfig config;
 
-        /// <summary>
-        /// This plays back the voice of the local player
-        /// </summary>
+        [Tooltip("This plays back the voice of the local player.")]
         public MetaSerializableReactiveProperty<bool> isEchoEnabled;
-        /// <summary>
-        /// This is the local player and they don't want to hear anyone else
-        /// </summary>
+        [Tooltip("This is the local player and they don't want to hear anyone else.")]
         public MetaSerializableReactiveProperty<bool> isDeafened;
-        /// <summary>
-        /// This is the local player and they don't want anyone to hear them
-        /// </summary>
+        [Tooltip("This is the local player and they don't want anyone to hear them.")]
         public MetaSerializableReactiveProperty<bool> isInputMuted;
-        /// <summary>
-        /// This is a remote player that the local player doesn't want to hear
-        /// </summary>
+        [Tooltip("This is a remote player that the local player doesn't want to hear.")]
         public MetaSerializableReactiveProperty<bool> isOutputMuted;
-        /// <summary>
-        /// This is the local player and they are speaking
-        /// </summary>
+        [Tooltip("This is the local player and they are speaking.")]
         public MetaSerializableReactiveProperty<bool> isSpeaking;
 
         private INetProvider netProvider;
@@ -90,13 +80,18 @@ namespace Assets.Metater.MetaVoiceChat
         private VcEncoder encoder;
         private VcDecoder decoder;
 
-        private VcLocalJitter localJitter;
-        private VcRemoteJitter remoteJitter;
+        private VcJitter jitter;
+
+        private readonly System.Diagnostics.Stopwatch stopwatch = new();
+        private double Timestamp => stopwatch.Elapsed.TotalSeconds;
+
+        private void Awake()
+        {
+            config.Init();
+        }
 
         public void StartClient(INetProvider netProvider, bool isLocalPlayer, int maxDataBytesPerPacket)
         {
-            config.Init();
-
             this.netProvider = netProvider;
 
             this.isLocalPlayer = isLocalPlayer;
@@ -105,15 +100,16 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 encoder = new(config, maxDataBytesPerPacket);
 
-                localJitter = new();
-
                 audioInput.OnFrameReady += SendFrame;
+                audioInput.StartLocalPlayer();
             }
 
             decoder = new(config);
 
             // TODO Make settings configurable, also 1 second window is too big, maybe 100ms
-            remoteJitter = new(1, 0);
+            jitter = new(1, 0);
+
+            stopwatch.Restart();
         }
 
         private void SendFrame(int index, float[] samples)

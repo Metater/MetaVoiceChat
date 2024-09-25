@@ -13,21 +13,25 @@ namespace Assets.Metater.MetaVoiceChat
         public const int SamplesPerClip = SamplesPerSecond * ClipLoopSeconds;
 
         public const OpusBandwidth Bandwidth = OpusBandwidth.OPUS_BANDWIDTH_WIDEBAND;
-        public const OpusBandwidth MaxBandwidth = OpusBandwidth.OPUS_BANDWIDTH_WIDEBAND;
+        public const OpusBandwidth MaxBandwidth = Bandwidth;
         public const OpusMode Mode = OpusMode.MODE_SILK_ONLY;
 
         [Tooltip("Optimizes the codec for a particular application. The default is VOIP.")]
         public OpusApplication application = OpusApplication.OPUS_APPLICATION_VOIP;
 
-        [Tooltip("0 gives the fastest encoding but lower quality, while 10 gives the highest quality but slower encoding. The default is 10.")]
+        [Tooltip("0 gives the fastest encoding but lower quality, while 10 gives the highest quality but slower encoding. The default is 10. 10 is still pretty darn fast.")]
         [Range(0, 10)]
         public int complexity = 10;
 
-        [Tooltip("The size of the groups of audio samples sent in miliiseconds. The default is 20ms.")]
+        [Tooltip("The size of the groups of networked audio samples in milliseconds. The only valid choices are 10ms (160 samples), 20ms (320 samples), and 40ms (640 samples). The default is 20ms (320 samples). Longer frame sizes reduce network traffic but increase susceptibility to dropped packets and introduce more latency in the audio output buffer.")]
         public OpusFramesize framesize = OpusFramesize.OPUS_FRAMESIZE_20_MS;
 
         [Tooltip("Hints to the encoder the expected signal type. The default is voice.")]
         public OpusSignal signal = OpusSignal.OPUS_SIGNAL_VOICE;
+
+        [Tooltip("The time window where the RMS jitter values are calculated.")]
+        public float jitterWindow = 0.2f;
+        public float jitterDefault = 0.05f;
 
         [NonSerialized] public int framePeriodMs;
         [NonSerialized] public int framesPerSecond;

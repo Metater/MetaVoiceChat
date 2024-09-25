@@ -6,7 +6,7 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
     {
         private VcMic mic;
 
-        private void Start()
+        public override void StartLocalPlayer()
         {
             int samplesPerFrame = metaVc.config.samplesPerFrame;
 
@@ -17,6 +17,11 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
 
         private void OnDestroy()
         {
+            if (mic == null)
+            {
+                return;
+            }
+
             mic.OnFrameReady -= SendFrame;
             mic.Dispose();
         }

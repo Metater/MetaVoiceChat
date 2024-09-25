@@ -2,20 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace Assets.Metater.MetaVoiceChat
+namespace Assets.Metater.MetaVoiceChat.Output
 {
-    public class VcLocalJitter
-    {
-        private readonly System.Diagnostics.Stopwatch stopwatch = new();
-        public double Timestamp => stopwatch.Elapsed.TotalSeconds;
-
-        public VcLocalJitter()
-        {
-            stopwatch.Restart();
-        }
-    }
-
-    public class VcRemoteJitter
+    public class VcJitter
     {
         private readonly double window;
         private readonly float defaultJitter;
@@ -27,7 +16,7 @@ namespace Assets.Metater.MetaVoiceChat
 
         private double previousTimestamp;
 
-        public VcRemoteJitter(double window, float defaultJitter)
+        public VcJitter(VcConfig config)
         {
             this.window = window;
             this.defaultJitter = defaultJitter;

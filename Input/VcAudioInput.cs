@@ -10,6 +10,8 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
         public event Action<int, float[]> OnFrameReady;
 
+        public abstract void StartLocalPlayer();
+
         protected void SendFrame(int frameIndex, float[] samples)
         {
             inputFilter.Filter(ref samples);

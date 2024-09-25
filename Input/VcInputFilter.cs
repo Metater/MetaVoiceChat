@@ -1,4 +1,3 @@
-using System.Linq;
 using Assets.Metater.MetaUtils;
 using UnityEngine;
 using UnityEngine.Audio;
@@ -92,12 +91,12 @@ namespace Assets.Metater.MetaVoiceChat.Input
 
         }
 
-        public bool Process(float[] segment)
-        {
-            currentInputVolume.Value = segment.Max(v => Mathf.Abs(v));
+        //public bool Process(float[] samples)
+        //{
+        //    currentInputVolume.Value = samples.Max(v => Mathf.Abs(v));
 
-            return true;
-        }
+        //    return true;
+        //}
 
         private void SetOutputVolume(float volume)
         {

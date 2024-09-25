@@ -28,11 +28,14 @@ TODO
     - Many exposed settings
 - TODO FILL IN OTHER FEATURES
 - TODO Set default values for everything
+- TODO Add tooltips to all settings (Check audio input and output mic and audio sources)
 
 ### Planned Features
 - Opus audio encoding
 - Documentation
 - Push to talk
+- Tutorial
+    - TODO Include configuration of output audio source, 3d sound and drop off to zero after a distance
 
 ## Implementations
 - [Mirror](https://github.com/MirrorNetworking/Mirror)
@@ -47,13 +50,13 @@ TODO
 
 ### Missing Implementations
 - [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/)
+- [LiteNetLib](https://github.com/RevenantX/LiteNetLib)
 - [Fish-Net](https://fish-networking.gitbook.io/docs)
 - [Dark Rift 2](https://github.com/DarkRiftNetworking/DarkRift)
 - [Unity WebRTC](https://github.com/Unity-Technologies/com.unity.webrtc)
 - [Photon Unity Networking 2](https://www.photonengine.com/pun)
 
 ### Missing Features
-- Tutorials
 - Examples
 - Multiple sample rates
 - Dual audio channel support
