@@ -1,11 +1,14 @@
 ![MetaVoiceChat Banner](MetaVoiceChat.png)
 
-## A simple and self-contained proximity voice chat solution for Unity's popular client-server networking libraries (currently only is Mirror supported*) with all of the features you need.
-&ast; Other libraries can easily be implemented by composing an agnostic MonoBehaviour — please feel free to contribute additional implementations.
+&ast; Currently, only Mirror is supported, however other libraries can easily be implemented by composing an agnostic MonoBehaviour and implementing an interface — please feel free to contribute additional network implementations.
+
+## Thank Yous
 
 ### A massive thank you to [Vatsal Ambastha](https://github.com/adrenak) and his projects [UniVoice](https://github.com/adrenak/univoice) and [UniMic](https://github.com/adrenak/unimic) that were heavily referenced when starting this project in late 2023.
 
-## Installation
+### Another thank you to [Concentus: Opus for Everyone](https://github.com/lostromb/concentus) for their native C# implementation of Opus that makes it extremely easy to add Opus to projects.
+
+## Installation Steps
 TODO
 
 ## Features
@@ -76,6 +79,9 @@ TODO
     - Opus features
         - Forward error correction
     - Multiple chat rooms
+
+## How do I write a network implementation?
+- TODO
 
 ## Tips
 - Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"
