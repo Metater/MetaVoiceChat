@@ -6,16 +6,20 @@ namespace Assets.Metater.MetaVoiceChat.Input
     public abstract class VcAudioInput : MonoBehaviour
     {
         public MetaVc metaVc;
-        public VcInputFilter inputFilter;
+        public VcInputFilter firstInputFilter;
 
         public event Action<int, float[]> OnFrameReady;
 
         public abstract void StartLocalPlayer();
 
-        protected void SendFrame(int frameIndex, float[] samples)
+        protected void SendAndFilterFrame(int index, float[] samples)
         {
-            inputFilter.Filter(ref samples);
-            OnFrameReady?.Invoke(frameIndex, samples);
+            if (firstInputFilter != null)
+            {
+                firstInputFilter.FilterRecursively(index, ref samples);
+            }
+
+            OnFrameReady?.Invoke(index, samples);
         }
     }
 }

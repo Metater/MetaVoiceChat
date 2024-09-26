@@ -140,8 +140,8 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
                         int offsetSamples = readAbsPos % AudioClip.samples;
                         AudioClip.GetData(samples, offsetSamples);
 
-                        int frameIndex = NextFrameIndex;
-                        OnFrameReady?.Invoke(frameIndex, samples);
+                        int index = NextFrameIndex;
+                        OnFrameReady?.Invoke(index, samples);
 
                         readAbsPos = nextReadAbsPos;
                         isNewDataAvailable = true;

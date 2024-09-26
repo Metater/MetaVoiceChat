@@ -1,4 +1,4 @@
-// This is a derivative work of the following projects, which were created by Vatsal Ambastha:
+// This project referenced the following projects in its beginnings, which were created by Vatsal Ambastha:
 // https://github.com/adrenak/univoice
 // https://github.com/adrenak/univoice-unimic-input
 // https://github.com/adrenak/unimic
@@ -170,7 +170,7 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 SetIsSpeaking(false);
 
-                audioOutput.ReceiveFrame(index, null, targetLatency);
+                audioOutput.ReceiveAndFilterFrame(index, null, targetLatency);
             }
             else
             {
@@ -178,7 +178,7 @@ namespace Assets.Metater.MetaVoiceChat
 
                 if (netProvider.IsLocalPlayerDeafened || isOutputMuted)
                 {
-                    audioOutput.ReceiveFrame(index, null, targetLatency);
+                    audioOutput.ReceiveAndFilterFrame(index, null, targetLatency);
                 }
                 else
                 {
@@ -187,13 +187,13 @@ namespace Assets.Metater.MetaVoiceChat
                     {
                         var array = FixedLengthArrayPool<float>.Rent(samples.Length);
                         samples.CopyTo(array);
-                        audioOutput.ReceiveFrame(index, array, targetLatency);
+                        audioOutput.ReceiveAndFilterFrame(index, array, targetLatency);
                         FixedLengthArrayPool<float>.Return(array);
                     }
                     else
                     {
                         // Silently ignore the frame with invalid length
-                        audioOutput.ReceiveFrame(index, null, targetLatency);
+                        audioOutput.ReceiveAndFilterFrame(index, null, targetLatency);
                     }
                 }
             }

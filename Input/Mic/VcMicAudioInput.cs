@@ -11,7 +11,7 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
             int samplesPerFrame = metaVc.config.samplesPerFrame;
 
             mic = new(this, samplesPerFrame);
-            mic.OnFrameReady += SendFrame;
+            mic.OnFrameReady += SendAndFilterFrame;
             mic.StartRecording();
         }
 
@@ -22,7 +22,7 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
                 return;
             }
 
-            mic.OnFrameReady -= SendFrame;
+            mic.OnFrameReady -= SendAndFilterFrame;
             mic.Dispose();
         }
     }

@@ -3,6 +3,8 @@
 using Assets.Metater.MetaUtils;
 using UnityEngine;
 
+// Would this be a better option? https://docs.unity3d.com/ScriptReference/MonoBehaviour.OnAudioFilterRead.html
+
 namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 {
     public class VcAudioSourceOutput : VcAudioOutput
@@ -190,7 +192,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
             return vcAudioClip.GetOffsetFrames(frameIndex) * secondsPerFrame;
         }
 
-        public override void ReceiveFrame(int index, float[] samples, float targetLatency)
+        protected override void ReceiveFrame(int index, float[] samples, float targetLatency)
         {
             this.targetLatency = targetLatency;
 
