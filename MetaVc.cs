@@ -34,19 +34,15 @@
 // Also, change the config output segment range to a plus or minus value. Just use plus or minus one segment, +- 25ms???
 // Then set pitch equal to one while in this range, else use P controller to adjust
 
-// If this becomes popular you could make a version where you implement MetaVc for your target networking library and don't depend on Mirror
-// Support NGO?
-
 // Post on reddit and mirror discord to advertise
 
 // TODO FIX ISSUE WHERE YOU CANT SEND MORE THAN ONE PACKET PER FRAME, THIS IS VERY BAD, < 50 FPS MEANS TERRIBLE QUALITY
 
-// MirrorVcManager could be created to handle all of the networking in a single place and to batch frames with the same timestamp sending from the server to clients,
-// however this is extra complexity
-
 // TODO Test with low video frame rates
 
 // TODO Determine the minimum follow latency
+
+// TODO Ensure all number units have a single space between
 
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
@@ -65,7 +61,11 @@ namespace Assets.Metater.MetaVoiceChat
         public VcConfig config;
 
         [Tooltip("This plays back the voice of the local player.")]
-        public MetaSerializableReactiveProperty<bool> isEchoEnabled;
+        public bool isEchoEnabled;
+
+        [Tooltip("This overwrites the audio input with a 200 Hz sine wave at 20% volume.")]
+        public bool isSineEnabled;
+
         [Tooltip("This is the local player and they don't want to hear anyone else.")]
         public MetaSerializableReactiveProperty<bool> isDeafened;
         [Tooltip("This is the local player and they don't want anyone to hear them.")]
@@ -115,13 +115,16 @@ namespace Assets.Metater.MetaVoiceChat
 
         private void SendFrame(int index, float[] samples)
         {
-            //if (samples != null)
-            //{
-            //    for (int i = 0; i < samples.Length; i++)
-            //    {
-            //        samples[i] = 0.2f * Mathf.Sin(Mathf.PI * i * (1.0f / 40.0f));
-            //    }
-            //}
+            if (samples != null && isSineEnabled)
+            {
+                const float Amplitude = 0.2f;
+
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    // TODO Make this frame size independent
+                    samples[i] = Amplitude * Mathf.Sin(Mathf.PI * i * (1.0f / 40.0f));
+                }
+            }
 
             bool isSpeaking = samples != null;
 
@@ -154,16 +157,18 @@ namespace Assets.Metater.MetaVoiceChat
         {
             // TODO Use exponential backoff. Is the jitter stuff even needed?
 
+            // TODO Involve Time.deltaTime in the target latency calculation, maybe just add 1.25  * Time.deltaTime to the target latency??
+
             float targetLatency;
             if (isLocalPlayer)
             {
                 // TODO Make this constant a variable?
-                targetLatency = 0.027f;
+                targetLatency = 0.027f + 0.1f;
             }
             else
             {
                 float jitter = this.jitter.Update(timestamp);
-                targetLatency = Mathf.Max(jitter, 0.032f); // 40ms seemed to work, 27 ms occasional pauses
+                targetLatency = Mathf.Max(jitter, 0.032f); // 40 ms seemed to work, 27 ms occasional pauses
             }
 
             if (data.Length == 0)

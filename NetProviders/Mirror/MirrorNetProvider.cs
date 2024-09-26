@@ -5,6 +5,9 @@ using Assets.Metater.MetaVoiceChat.Utils;
 using Mirror;
 using UnityEngine;
 
+// A possible optimization is to handle all of the networking in one manager class and batch frames with a single timestamp.
+// However, this is complex and benefits are negligible.
+
 namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 {
     [RequireComponent(typeof(MetaVc))]

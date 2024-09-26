@@ -34,13 +34,13 @@
         - Deafening yourself
         - Input muting yourself
         - Output muting others
-        - Echo mode
     - Voice activation detection and latching
 - Modular
     - Abstract VcAudioInput and VcAudioOutput classes
     - Abstract VcInputFilter and VcOutputFilter pipelines
 - Testable
     - Echo mode to playback your own voice
+    - Sine wave mode
 - Details
     - No memory garbage created at runtime using pooled data buffers
     - Fixed 16kHz sampling frequency
