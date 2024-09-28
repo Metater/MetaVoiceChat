@@ -119,10 +119,11 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 const float Amplitude = 0.2f;
 
+                float multiplier = Mathf.PI * (1.0f / 40.0f);
+
                 for (int i = 0; i < samples.Length; i++)
                 {
-                    // TODO Make this frame size independent
-                    samples[i] = Amplitude * Mathf.Sin(Mathf.PI * i * (1.0f / 40.0f));
+                    samples[i] = Amplitude * Mathf.Sin(i * multiplier);
                 }
             }
 
@@ -155,21 +156,34 @@ namespace Assets.Metater.MetaVoiceChat
 
         public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
+            //print($"Data = {data.Length}");
+
             // TODO Use exponential backoff. Is the jitter stuff even needed?
 
             // TODO Involve Time.deltaTime in the target latency calculation, maybe just add 1.25  * Time.deltaTime to the target latency??
 
-            float targetLatency;
-            if (isLocalPlayer)
-            {
-                // TODO Make this constant a variable?
-                targetLatency = 0.027f + 0.1f;
-            }
-            else
+            if (!isLocalPlayer)
             {
                 float jitter = this.jitter.Update(timestamp);
-                targetLatency = Mathf.Max(jitter, 0.032f); // 40 ms seemed to work, 27 ms occasional pauses
+                print(jitter * 1000);
             }
+
+            float targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime;
+            //if (isLocalPlayer)
+            //{
+            //    // TODO Make this constant a variable?
+            //    //targetLatency = 0.027f;
+
+            //    targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime;
+            //}
+            //else
+            //{
+            //    //targetLatency = Mathf.Max(jitter, 0.032f); // 40 ms seemed to work, 27 ms occasional pauses
+
+            //    targetLatency = config.secondsPerFrame + Time.deltaTime;
+            //}
+
+            //targetLatency *= 1.25f;
 
             if (data.Length == 0)
             {
@@ -188,6 +202,7 @@ namespace Assets.Metater.MetaVoiceChat
                 else
                 {
                     var samples = decoder.DecodeFrame(data);
+
                     if (samples.Length == config.samplesPerFrame)
                     {
                         var array = FixedLengthArrayPool<float>.Rent(samples.Length);

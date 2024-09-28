@@ -5,18 +5,22 @@ namespace Assets.Metater.MetaVoiceChat.Utils
     public static class FixedLengthArrayPool<T>
     {
         private static readonly Dictionary<int, Stack<T[]>> pool = new();
+        private static readonly object poolLock = new();
 
         public static T[] Rent(int length)
         {
-            if (!pool.TryGetValue(length, out var stack))
+            lock (poolLock)
             {
-                stack = new Stack<T[]>();
-                pool.Add(length, stack);
-            }
+                if (!pool.TryGetValue(length, out var stack))
+                {
+                    stack = new Stack<T[]>();
+                    pool.Add(length, stack);
+                }
 
-            if (stack.Count > 0)
-            {
-                return stack.Pop();
+                if (stack.Count > 0)
+                {
+                    return stack.Pop();
+                }
             }
 
             return new T[length];
@@ -24,13 +28,16 @@ namespace Assets.Metater.MetaVoiceChat.Utils
 
         public static void Return(T[] array)
         {
-            if (!pool.TryGetValue(array.Length, out var stack))
+            lock (poolLock)
             {
-                stack = new Stack<T[]>();
-                pool.Add(array.Length, stack);
-            }
+                if (!pool.TryGetValue(array.Length, out var stack))
+                {
+                    stack = new Stack<T[]>();
+                    pool.Add(array.Length, stack);
+                }
 
-            stack.Push(array);
+                stack.Push(array);
+            }
         }
     }
 }

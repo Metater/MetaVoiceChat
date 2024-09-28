@@ -17,7 +17,6 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
         public float maxNegativeLatency = 0.25f;
         [Tooltip("The proportional gain of the pitch controller. The units are percent per second of latency error.")]
         public float pitchProportionalGain = 1;
-        //[Range(0, 0.05f)] public float targetLatencyOverride;
 
         private int framesPerSecond;
         private float secondsPerFrame;
@@ -45,7 +44,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
             var config = metaVc.config;
             framesPerSecond = config.framesPerSecond;
-            secondsPerFrame = config.framePeriodMs / 1000f;
+            secondsPerFrame = config.secondsPerFrame;
 
             vcAudioClip = new(config.samplesPerFrame, config.framesPerClip, audioSource);
             clipFrameIndicies = new int[config.framesPerClip];
@@ -93,20 +92,27 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
             float latency = GetLatency();
 
             latencyCsv.AddRow(Time.time, targetLatency * 1000);
+            //print((int)(latency * 1000));
 
-            // Pause while latency is negative, rebuild the buffer
-            if (latency < 0)
             {
-                if (audioSource.isPlaying)
-                {
-                    audioSource.Pause();
-                    Debug.Log("Paused");
-                }
-            }
-            else if (!audioSource.isPlaying)
-            {
-                audioSource.Play();
-                Debug.Log("Unpaused");
+                //// Pause while latency is too low, rebuild the buffer
+                //float minimumLatency = secondsPerFrame * 2;
+                //if (latency < minimumLatency)
+                //{
+                //    if (audioSource.isPlaying)
+                //    {
+                //        audioSource.Pause();
+                //        Debug.Log("Paused");
+                //    }
+                //}
+                //else if (!audioSource.isPlaying)
+                //{
+                //    if (latency > minimumLatency)
+                //    {
+                //        audioSource.Play();
+                //        Debug.Log("Unpaused");
+                //    }
+                //}
             }
 
             // Adjust pitch in order to reach target segment lag

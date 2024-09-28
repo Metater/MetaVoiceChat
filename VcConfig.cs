@@ -36,6 +36,7 @@ namespace Assets.Metater.MetaVoiceChat
 
         [NonSerialized] public int framePeriodMs;
         [NonSerialized] public int framesPerSecond;
+        [NonSerialized] public float secondsPerFrame;
         [NonSerialized] public int samplesPerFrame;
         [NonSerialized] public int framesPerClip;
 
@@ -55,6 +56,7 @@ namespace Assets.Metater.MetaVoiceChat
             };
 
             framesPerSecond = 1000 / framePeriodMs;
+            secondsPerFrame = framePeriodMs / 1000f;
 
             samplesPerFrame = SamplesPerSecond / framesPerSecond;
 

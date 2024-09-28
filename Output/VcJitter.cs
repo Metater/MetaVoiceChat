@@ -50,8 +50,11 @@ namespace Assets.Metater.MetaVoiceChat.Output
 
             if (diffs.Count > 0)
             {
-                float rmsJitter = Mathf.Sqrt(diffs.Average(d => d.diff * d.diff));
-                return rmsJitter;
+                //float rmsJitter = Mathf.Sqrt(diffs.Average(d => d.diff * d.diff));
+                //return rmsJitter;
+
+                float jitter = diffs.Max(d => Mathf.Abs(d.diff));
+                return jitter;
             }
 
             return jitterDefault;
