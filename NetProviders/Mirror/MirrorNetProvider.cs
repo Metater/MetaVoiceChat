@@ -8,6 +8,8 @@ using UnityEngine;
 // A possible optimization is to handle all of the networking in one manager class and batch frames with a single timestamp.
 // However, this is complex and benefits are negligible.
 
+// I apologize for how confusing and ugly the additional latency code is.
+
 namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 {
     [RequireComponent(typeof(MetaVc))]
@@ -19,9 +21,9 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         public static IReadOnlyList<MirrorNetProvider> Instances => instances;
         #endregion
 
-        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.metaVc.isDeafened;
+        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.MetaVc.isDeafened;
 
-        public MetaVc metaVc;
+        public MetaVc MetaVc { get; private set; }
 
         public override void OnStartClient()
         {
@@ -44,7 +46,8 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
                 return bytes;
             }
 
-            metaVc.StartClient(this, isLocalPlayer, GetMaxDataBytesPerPacket());
+            MetaVc = GetComponent<MetaVc>();
+            MetaVc.StartClient(this, isLocalPlayer, GetMaxDataBytesPerPacket());
         }
 
         public override void OnStopClient()
@@ -58,7 +61,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             instances.Remove(this);
             #endregion
 
-            metaVc.StopClient();
+            MetaVc.StopClient();
         }
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
@@ -67,8 +70,8 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             data.CopyTo(array);
 
             float additionalLatency = Time.deltaTime;
-
             MirrorFrame frame = new(index, timestamp, additionalLatency, array);
+
             if (isServer)
             {
                 RpcReceiveFrame(frame);
@@ -82,7 +85,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         }
 
         [Command(channel = Channels.Unreliable)]
-        private void CmdRelayFrame(MirrorFrame frame, NetworkConnectionToClient sender = null)
+        private void CmdRelayFrame(MirrorFrame frame)
         {
             float additionalLatency = frame.additionalLatency + Time.deltaTime;
             frame = new(frame.index, frame.timestamp, additionalLatency, frame.data);
@@ -94,7 +97,16 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
         private void RpcReceiveFrame(MirrorFrame frame)
         {
-            metaVc.ReceiveFrame(frame.index, frame.timestamp, frame.additionalLatency, frame.data);
+            if (isServer)
+            {
+                // Don't apply server Time.deltaTime to additionalLatency -- this frame did not go over the network again.
+                float additionalLatency = frame.additionalLatency - Time.deltaTime;
+                MetaVc.ReceiveFrame(frame.index, frame.timestamp, additionalLatency, frame.data);
+            }
+            else
+            {
+                MetaVc.ReceiveFrame(frame.index, frame.timestamp, frame.additionalLatency, frame.data);
+            }
         }
     }
 }

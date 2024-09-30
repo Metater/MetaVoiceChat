@@ -33,6 +33,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
 
     public static class MirrorFrameReaderWriter
     {
+        // There is probably a better place to set this limitation
         private const float MaxAdditionalLatency = 0.2f;
 
         public static void WriteMirrorFrame(this NetworkWriter writer, MirrorFrame value)

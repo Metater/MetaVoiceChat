@@ -1,6 +1,5 @@
 // Influenced by: https://github.com/adrenak/univoice-audiosource-output/blob/master/Assets/Adrenak.UniVoice.AudioSourceOutput/Runtime/UniVoiceAudioSourceOutput.cs
 
-using Assets.Metater.MetaUtils;
 using UnityEngine;
 
 // Would this be a better option? https://docs.unity3d.com/ScriptReference/MonoBehaviour.OnAudioFilterRead.html
@@ -11,12 +10,14 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
     {
         [Tooltip("The output audio source.")]
         public UnityEngine.AudioSource audioSource;
-        [Tooltip("The time a frame lives in the buffer for before being cleared.")]
-        public float frameLifetimeSeconds = 0.5f;
-        [Tooltip("The maximum negative latency allowed before pausing the audio source to rebuild the buffer.")]
+        [Tooltip("The time a frame lives in the buffer for before being cleared. The units are seconds.")]
+        public float frameLifetime = 0.5f;
+        [Tooltip("The largest magnitude latency considered negative before wrapping around to positive values. The units are seconds.")]
         public float maxNegativeLatency = 0.25f;
         [Tooltip("The proportional gain of the pitch controller. The units are percent per second of latency error.")]
         public float pitchProportionalGain = 1;
+        [Tooltip("The maximum increase or decrease in pitch allowed. The units are percent.")]
+        public float pitchMaxCorrection = 0.2f; // Was 0.25 for a while
 
         private int framesPerSecond;
         private float secondsPerFrame;
@@ -33,9 +34,6 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
         private bool isInit = false;
 
         private float targetLatency;
-
-        private readonly MetaCsv csv = new("Time", "Error");
-        private readonly MetaCsv latencyCsv = new("Time", "Latency");
 
         private void Start()
         {
@@ -56,9 +54,6 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
         private void Update()
         {
-            //print(targetLatency);
-            //targetLatency = targetLatencyOverride;
-
             // Build up the buffer until the target latency is reached and start playing at the correct clip time
             if (!isInit)
             {
@@ -91,60 +86,48 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
             float latency = GetLatency();
 
-            latencyCsv.AddRow(Time.time, targetLatency * 1000);
-            //print((int)(latency * 1000));
+            // Pause while latency is too low, rebuild the buffer
+            // At one point minimum latencies were both zero and also secondsPerFrame * 2
+            // I don't thinks this block is really needed
+            //{
+            //    float pauseMinimumLatency = 0;
+            //    float rebuildMinimumLatency = secondsPerFrame * 2;
+            //    if (latency < pauseMinimumLatency)
+            //    {
+            //        if (audioSource.isPlaying)
+            //        {
+            //            audioSource.Pause();
+            //            Debug.Log("Paused");
+            //        }
+            //    }
+            //    else if (!audioSource.isPlaying)
+            //    {
+            //        if (latency > rebuildMinimumLatency)
+            //        {
+            //            audioSource.Play();
+            //            Debug.Log("Unpaused");
+            //        }
+            //    }
+            //}
 
-            {
-                //// Pause while latency is too low, rebuild the buffer
-                //float minimumLatency = secondsPerFrame * 2;
-                //if (latency < minimumLatency)
-                //{
-                //    if (audioSource.isPlaying)
-                //    {
-                //        audioSource.Pause();
-                //        Debug.Log("Paused");
-                //    }
-                //}
-                //else if (!audioSource.isPlaying)
-                //{
-                //    if (latency > minimumLatency)
-                //    {
-                //        audioSource.Play();
-                //        Debug.Log("Unpaused");
-                //    }
-                //}
-            }
+            // Idea: Mirror uses unsymmetrical corrections for NetworkTime, should this?
+            // Mirror does this:
+            /*
+                [Tooltip("Local timeline acceleration in % while catching up.")]
+                [Range(0, 1)]
+                public double catchupSpeed = 0.02f; // see snap interp demo. 1% is too slow.
+
+                [Tooltip("Local timeline slowdown in % while slowing down.")]
+                [Range(0, 1)]
+                public double slowdownSpeed = 0.04f; // slow down a little faster so we don't encounter empty buffer (= jitter)
+            */
 
             // Adjust pitch in order to reach target segment lag
             {
                 float error = targetLatency - latency;
-
-                {
-                    //ema.Add(error);
-                    //csv.AppendLine(Time.time + "," + ema.Value);
-                    csv.AddRow(Time.time, error * 1000);
-                    //csv.AppendLine(Time.time + "," + GetRawLatency());
-                }
-
-                //if (latencySegments >= config.OutputLagSegmentsRange.x && latencySegments <= config.OutputLagSegmentsRange.y)
-                //{
-                //    audioSource.pitch = 1f;
-
-                //    //Debug.Log("Good");
-                //}
-                //else
-                {
-                    //Debug.Log(errorSegments);
-
-                    // Artificially increase the error to more quickly remove steady-state error
-                    //errorSegments += Mathf.Sign(errorSegments) * config.OutputErrorBias;
-
-                    //errorSegments = (float)ema.Value / config.SegmentPeriodMs;
-
-                    float response = -error * pitchProportionalGain;
-                    response = Mathf.Clamp(response, -0.25f, 0.25f);
-                    audioSource.pitch = 1f + response;
-                }
+                float response = -error * pitchProportionalGain;
+                response = Mathf.Clamp(response, -pitchMaxCorrection, pitchMaxCorrection);
+                audioSource.pitch = 1f + response;
             }
 
             ClearOldFrames();
@@ -159,7 +142,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
                 {
                     int ageFrames = greatestFrameIndex - frameIndex;
                     float ageSeconds = ageFrames * secondsPerFrame;
-                    if (ageSeconds > frameLifetimeSeconds)
+                    if (ageSeconds > frameLifetime)
                     {
                         vcAudioClip.ClearFrame(i);
                         clipFrameIndicies[i] = -1;
@@ -222,9 +205,6 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
         private void OnDestroy()
         {
             vcAudioClip.Dispose();
-
-            csv.Dispose();
-            latencyCsv.Dispose();
         }
     }
 }

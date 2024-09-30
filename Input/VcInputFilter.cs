@@ -7,7 +7,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
         public VcInputFilter nextInputFilter;
 
         /// <summary>
-        /// Usage: Setting the samples array to null will stop the pipeline and signal that no samples should be sent.
+        /// Usage: Setting the samples array to null will stop the pipeline and signal that the samples should not be sent. The incoming samples array may be null.
         /// </summary>
         protected abstract void Filter(int index, ref float[] samples);
 

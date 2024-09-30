@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Do device list changes at runtime cause any bugs?
+// What if someone unplugs a microphone while recording?
 
 namespace Assets.Metater.MetaVoiceChat.Input.Mic
 {
@@ -20,7 +21,7 @@ namespace Assets.Metater.MetaVoiceChat.Input.Mic
 
         public IReadOnlyList<string> Devices => Microphone.devices;
         public int CurrentDeviceIndex { get; private set; } = -1;
-        private string CurrentDeviceName
+        public string CurrentDeviceName
         {
             get
             {

@@ -7,7 +7,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
         public VcOutputFilter nextOutputFilter;
 
         /// <summary>
-        /// Usage: Directly modify the samples array to achieve the desired filter.
+        /// Usage: Directly modify the samples array to achieve the desired filter. The incoming samples array may be null.
         /// </summary>
         protected abstract void Filter(int index, float[] samples, float targetLatency);
 

@@ -1,6 +1,6 @@
 ![MetaVoiceChat Banner](MetaVoiceChat.png)
 
-&ast; Currently, only Mirror is supported, however other libraries can easily be implemented by composing an agnostic MonoBehaviour and implementing a minimal interface — please feel free to contribute additional network implementations.
+&ast; Currently, only Mirror is supported, however other libraries can easily be implemented by composing an agnostic MonoBehaviour and implementing a minimal interface — please feel free to contribute additional network implementations. Please make PRs with your contributions if you feel they would be helpful to the public.
 
 ## Table of Contents
 - [Thank Yous](#thank-yous)
@@ -8,14 +8,16 @@
 - [Features](#information)
 - [Tutorial](#tutorial)
 
+TODO Add Concentus locally to this project
+
 ## Installation
 1. TODO
 
 ## Information
 - Simple
-    - Default Unity Microphone
-    - No code required
-    - No complicated cloud services required
+    - Default Unity microphone
+    - No user code required and completely self-contained
+    - No complicated cloud services required -- everything just works with your existing networking library
 - Configurable
     - Settings for...
     - Exposed Opus settings
@@ -26,15 +28,16 @@
     - TODO Jitter
         - Window size in seconds
         - Default value in seconds
-    - Output
-        - Unity Audio Source
+    - Default input is the Unity microphone
+    - Default output is a Unity Audio Source
 - Functional
     - Functionality and reactive properties with events for
         - Speaking
         - Deafening yourself
         - Input muting yourself
         - Output muting others
-    - Voice activation detection and latching
+    - Unity microphone wrapper
+    - Circular audio clip
 - Modular
     - Abstract VcAudioInput and VcAudioOutput classes
     - Abstract VcInputFilter and VcOutputFilter pipelines
@@ -44,12 +47,15 @@
 - Details
     - No memory garbage created at runtime using pooled data buffers
     - Fixed 16kHz sampling frequency
-    - Single audio channel per microphone
-    - 16-bit PCM audio
+    - Fixed wideband Opus bandwidth
+    - Fixed SILK Opus mode
+    - Fixed single audio channel
+    - Fixed 16-bit audio
     - Latency is ~250ms on average (Unity's crappy microphone is to blame for ~200ms)
+    - TODO ^^^ REMEASURE AVERAGE
 
 - UI settings and indicators with hooks and an official implementation that saves to PlayerPrefs
-- Dynamic desync compensation using a latency error P-controller with RMS jitter adjustment
+- Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender, and receiver FPS adjustments
 - Opus features
     - Variable bitrate encoding
     - Many exposed settings
@@ -58,11 +64,8 @@
 - TODO Add tooltips to all settings (Check audio input and output mic and audio sources)
 
 ### Planned Features
-- Opus audio encoding
-- Documentation
+- Voice activation detection and latching
 - Push to talk
-- Tutorial
-    - TODO Include configuration of output audio source, 3d sound and drop off to zero after a distance
 
 ## Tutorial
 1. TODO
@@ -71,7 +74,7 @@
     - "Output" = the voice chat audio mixer group
     - "Play On Awake" = false
     - "Loop" is set to true internally, so don't worry
-    - "Spacial Blend" = 1 for proximity chat
+    - "Spacial Blend" = 1 for 3D proximity chat
     - "3D Sound Settings"
         - "Doppler Level" is set to zero internally, so don't worry (it must be zero because of how Unity implements this)
         - "Max Distance" = ~50 meters or whatever you think is best
@@ -79,6 +82,27 @@
 
 ## Tips
 - Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"
+- Chain together input and ouput filters to form pipelines by using the first and next filter fields
+
+## Public APIs
+```cs
+public class VcMic : IDisposable
+{
+    public bool IsRecording { get; }
+    public AudioClip AudioClip { get; }
+    public IReadOnlyList<string> Devices { get; }
+    public int CurrentDeviceIndex { get; }
+    public int CurrentDeviceName { get; }
+
+    // zero-based frame index, samples
+    public event Action<int, float[]> OnFrameReady;
+
+    public void SetDeviceIndex(int index) { }
+    public void StartRecording() { }
+    public void StopRecording() { }
+    public void Dispose() { }
+}
+```
 
 ## Thank Yous
 

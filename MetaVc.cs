@@ -7,24 +7,6 @@
 // This was created by Connor Myers (Metater):
 // https://github.com/Metater
 
-// Known issues:
-// 1:
-// High contigious packet loss and/or a momentary high jitter causes
-// Need to catch up (squeaky voice) or slowdown because latency passed zero then went to the clip length
-// Solutions:
-// 1: Pause audio source until latency passes zero going from large number limit to zero.
-// Probably want to prevent exact overlap of playing time and writing time, dont want to set a segment that is currently being played
-// Mirror does this:
-/*
-    [Tooltip("Local timeline acceleration in % while catching up.")]
-    [Range(0, 1)]
-    public double catchupSpeed = 0.02f; // see snap interp demo. 1% is too slow.
-
-    [Tooltip("Local timeline slowdown in % while slowing down.")]
-    [Range(0, 1)]
-    public double slowdownSpeed = 0.04f; // slow down a little faster so we don't encounter empty buffer (= jitter)
-*/
-
 // Use a timer for MetaVcs with output enabled to request the time from the player that is speaking to this MetaVc output
 // Use the sent back time and the current time to calculate instantaneous jitter
 // Perhaps use Exponential moving average on the jitter or just average it over the past second
@@ -35,12 +17,6 @@
 // Then set pitch equal to one while in this range, else use P controller to adjust
 
 // Post on reddit and mirror discord to advertise
-
-// TODO FIX ISSUE WHERE YOU CANT SEND MORE THAN ONE PACKET PER FRAME, THIS IS VERY BAD, < 50 FPS MEANS TERRIBLE QUALITY
-
-// TODO Test with low video frame rates
-
-// Exponential backoff is an alternative to the current jitter calculation
 
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
@@ -159,10 +135,11 @@ namespace Assets.Metater.MetaVoiceChat
 
             if (!isLocalPlayer)
             {
+                // Exponential backoff is an alternative to the current jitter calculation, but this works!
                 float jitter = this.jitter.Update(timestamp);
                 targetLatency += jitter;
 
-                Debug.Log($"Jitter: {(int)(jitter * 1000)} ms");
+                //Debug.Log($"Target Latency: {(int)(targetLatency * 1000)} ms");
             }
 
             if (data.Length == 0)

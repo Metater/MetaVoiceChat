@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Assets.Metater.MetaVoiceChat.Utils
@@ -9,6 +10,11 @@ namespace Assets.Metater.MetaVoiceChat.Utils
 
         public static T[] Rent(int length)
         {
+            if (length == 0)
+            {
+                return Array.Empty<T>();
+            }
+
             lock (poolLock)
             {
                 if (!pool.TryGetValue(length, out var stack))
@@ -28,6 +34,11 @@ namespace Assets.Metater.MetaVoiceChat.Utils
 
         public static void Return(T[] array)
         {
+            if (array.Length == 0)
+            {
+                return;
+            }
+
             lock (poolLock)
             {
                 if (!pool.TryGetValue(array.Length, out var stack))
