@@ -7,17 +7,6 @@
 // This was created by Connor Myers (Metater):
 // https://github.com/Metater
 
-// Use a timer for MetaVcs with output enabled to request the time from the player that is speaking to this MetaVc output
-// Use the sent back time and the current time to calculate instantaneous jitter
-// Perhaps use Exponential moving average on the jitter or just average it over the past second
-// Use this jitter value as the latency target for the output audio source
-// However, a minimum jitter value should be set that equals the target 5 segments of latency
-// This 5 value could be lowered, but start with it. 5 * 25ms = 125ms
-// Also, change the config output segment range to a plus or minus value. Just use plus or minus one segment, +- 25ms???
-// Then set pitch equal to one while in this range, else use P controller to adjust
-
-// Post on reddit and mirror discord to advertise
-
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
 using Assets.Metater.MetaVoiceChat.NetProviders;
@@ -93,7 +82,7 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 const float Amplitude = 0.2f;
 
-                float multiplier = Mathf.PI * (1.0f / 40.0f);
+                float multiplier = Mathf.PI * (1.0f / 40.0f); // 200 Hz
 
                 for (int i = 0; i < samples.Length; i++)
                 {

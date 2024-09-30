@@ -10,13 +10,13 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
     {
         [Tooltip("The output audio source.")]
         public UnityEngine.AudioSource audioSource;
-        [Tooltip("The time a frame lives in the buffer for before being cleared. The units are seconds.")]
+        [Tooltip("The time a frame lives in the buffer for before being cleared out. The units are seconds.")]
         public float frameLifetime = 0.5f;
         [Tooltip("The largest magnitude latency considered negative before wrapping around to positive values. The units are seconds.")]
         public float maxNegativeLatency = 0.25f;
         [Tooltip("The proportional gain of the pitch controller. The units are percent per second of latency error.")]
         public float pitchProportionalGain = 1;
-        [Tooltip("The maximum increase or decrease in pitch allowed. The units are percent.")]
+        [Tooltip("The maximum increase or decrease in pitch allowed for a correction. The units are percent.")]
         public float pitchMaxCorrection = 0.2f; // Was 0.25 for a while
 
         private int framesPerSecond;
@@ -88,7 +88,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
             // Pause while latency is too low, rebuild the buffer
             // At one point minimum latencies were both zero and also secondsPerFrame * 2
-            // I don't thinks this block is really needed
+            // I don't think this block is really needed
             //{
             //    float pauseMinimumLatency = 0;
             //    float rebuildMinimumLatency = secondsPerFrame * 2;
@@ -122,7 +122,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
                 public double slowdownSpeed = 0.04f; // slow down a little faster so we don't encounter empty buffer (= jitter)
             */
 
-            // Adjust pitch in order to reach target segment lag
+            // Adjust pitch in order to reach target latency
             {
                 float error = targetLatency - latency;
                 float response = -error * pitchProportionalGain;

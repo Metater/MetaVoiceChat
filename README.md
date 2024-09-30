@@ -20,6 +20,12 @@ TODO Add Concentus locally to this project
     - No complicated cloud services required -- everything just works with your existing networking library
 - Configurable
     - Settings for...
+    - VcAudioSourceOutput settings
+        - Audio source
+        - Frame lifetime
+        - Max negative latency
+        - Pitch proportional gain
+        - Pitch max correction
     - Exposed Opus settings
         - Application: VOIP, Audio, or Restricted Low-Delay
         - Complexity: 0-10
@@ -38,6 +44,9 @@ TODO Add Concentus locally to this project
         - Output muting others
     - Unity microphone wrapper
     - Circular audio clip
+    - RMS jitter calculation utility within a time window and mean offset window using mean deviation
+    - Fixed length array pool utility
+    - Serializable reactive property utility
 - Modular
     - Abstract VcAudioInput and VcAudioOutput classes
     - Abstract VcInputFilter and VcOutputFilter pipelines
@@ -51,11 +60,9 @@ TODO Add Concentus locally to this project
     - Fixed SILK Opus mode
     - Fixed single audio channel
     - Fixed 16-bit audio
-    - Latency is ~250ms on average (Unity's crappy microphone is to blame for ~200ms)
-    - TODO ^^^ REMEASURE AVERAGE
-
-- UI settings and indicators with hooks and an official implementation that saves to PlayerPrefs
-- Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender, and receiver FPS adjustments
+    - Fixed 1 second input and output audio clip loop time
+    - Average latency is ~(250-300)ms with defaults (Unity's crappy microphone is to blame for ~200ms)
+    - Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender, and receiver FPS adjustments
 - Opus features
     - Variable bitrate encoding
     - Many exposed settings
@@ -66,6 +73,8 @@ TODO Add Concentus locally to this project
 ### Planned Features
 - Voice activation detection and latching
 - Push to talk
+- UI for settings and indicators with hooks and an official implementation that saves to PlayerPrefs
+- Abstract selection system for configuring voice chat settings for particular clients that the local player wants to configure
 
 ## Tutorial
 1. TODO
@@ -170,15 +179,17 @@ public class VcMic : IDisposable
 - Should code fail without throwing exceptions? Should silent failure be an option? E.g. VcMicAudioInput and VcAudioClip may throw.
 - How can vulnerabilities be found and compensated for?
 
-## Made with MetaVoiceChat
+## Games Made with MetaVoiceChat
 - TODO Bomb Bois Steam page URL
 
 ## License
 This project is licensed under the [MIT License](LICENSE)
 
 ## To-Do
-- Default UI
-- Abstract selection system for configuring voice chat settings for particular clients that the local player wants to configure
+- Post on Reddit and Mirror Discord to advertise
+- Add ranges to configurable values
+- Finish checking MetaVc.cs
+- Finish checking VcConfig.cs
 
 # Ideas
 - Text chat implementation with UI?
