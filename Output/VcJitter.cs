@@ -6,20 +6,19 @@ namespace Assets.Metater.MetaVoiceChat.Output
 {
     public class VcJitter
     {
-        private readonly double window;
-        private readonly float jitterDefault;
+        private readonly double timeWindow;
+        private readonly int meanOffsetWindow;
 
         private readonly System.Diagnostics.Stopwatch stopwatch = new();
-        private float TimeSincePreviousUpdate => (float)stopwatch.Elapsed.TotalSeconds;
+        private double LocalTimestamp => stopwatch.Elapsed.TotalSeconds;
 
-        private readonly Queue<Diff> diffs = new();
-
-        private double previousTimestamp;
+        private readonly Queue<Entry> entries = new();
+        private readonly Queue<double> offsets = new();
 
         public VcJitter(VcConfig config)
         {
-            window = config.jitterWindow;
-            jitterDefault = config.jitterDefault;
+            timeWindow = config.jitterTimeWindow;
+            meanOffsetWindow = config.jitterMeanOffsetWindow;
         }
 
         public float Update(double timestamp)
@@ -27,68 +26,65 @@ namespace Assets.Metater.MetaVoiceChat.Output
             if (!stopwatch.IsRunning)
             {
                 stopwatch.Restart();
-                previousTimestamp = timestamp;
-                return jitterDefault;
+                return 0;
             }
 
-            float diff = (float)(timestamp - previousTimestamp) - TimeSincePreviousUpdate;
-            diffs.Enqueue(new Diff(timestamp, diff));
+            double localTimestamp = LocalTimestamp;
 
-
-            if (timestamp > previousTimestamp)
             {
-                previousTimestamp = timestamp;
-            }
-
-            return CalculateRmsJitter(timestamp);
-        }
-
-        private float CalculateRmsJitter(double timestamp)
-        {
-            RemoveOldDiffs(timestamp);
-            stopwatch.Restart();
-
-            if (diffs.Count > 0)
-            {
-                //float rmsJitter = Mathf.Sqrt(diffs.Average(d => d.diff * d.diff));
-                //return rmsJitter;
-
-                float jitter = diffs.Max(d => Mathf.Abs(d.diff));
-                return jitter;
-            }
-
-            return jitterDefault;
-        }
-
-        private void RemoveOldDiffs(double timestamp)
-        {
-            while (diffs.TryPeek(out var diff))
-            {
-                if (diff.GetAge(timestamp) > window)
+                entries.Enqueue(new Entry(timestamp, localTimestamp));
+                while (entries.TryPeek(out var entry))
                 {
-                    diffs.Dequeue();
-                }
-                else
-                {
-                    break;
+                    if (entry.GetAge(localTimestamp) > timeWindow)
+                    {
+                        entries.Dequeue();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
-        }
 
-        private readonly struct Diff
-        {
-            private readonly double enqueueTimestamp;
-            public readonly float diff;
-
-            public Diff(double enqueueTimestamp, float diff)
             {
-                this.enqueueTimestamp = enqueueTimestamp;
-                this.diff = diff;
+                offsets.Enqueue(localTimestamp - timestamp);
+                if (offsets.Count > meanOffsetWindow)
+                {
+                    offsets.Dequeue();
+                }
             }
 
-            public float GetAge(double timestamp)
+            double meanOffset = offsets.Average();
+
+            if (entries.Count > 0)
             {
-                return (float)(timestamp - enqueueTimestamp);
+                float SquareDeviation(Entry e)
+                {
+                    double deviation = meanOffset + e.timestamp - e.localTimestamp;
+                    return (float)(deviation * deviation);
+                }
+
+                float rmsJitter = Mathf.Sqrt(entries.Average(SquareDeviation));
+                return rmsJitter;
+            }
+
+            return 0;
+        }
+
+        private readonly struct Entry
+        {
+            public readonly double timestamp;
+            public readonly double localTimestamp;
+
+            public Entry(double timestamp, double localTimestamp)
+            {
+                this.timestamp = timestamp;
+                this.localTimestamp = localTimestamp;
+            }
+
+            public float GetAge(double localTimestamp)
+            {
+                return (float)(localTimestamp - this.localTimestamp);
             }
         }
     }

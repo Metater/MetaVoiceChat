@@ -39,6 +39,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
                 int bytes = NetworkMessages.MaxMessageSize(Channels.Unreliable) - 13;
                 bytes -= sizeof(int); // Index
                 bytes -= sizeof(double); // Timestamp
+                bytes -= sizeof(byte); // Additional latency
                 bytes -= sizeof(ushort); // Array length
                 return bytes;
             }
@@ -65,15 +66,26 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
             var array = FixedLengthArrayPool<byte>.Rent(data.Length);
             data.CopyTo(array);
 
-            MirrorFrame frame = new(index, timestamp, array);
-            CmdRelayFrame(frame);
+            float additionalLatency = Time.deltaTime;
+
+            MirrorFrame frame = new(index, timestamp, additionalLatency, array);
+            if (isServer)
+            {
+                RpcReceiveFrame(frame);
+            }
+            else
+            {
+                CmdRelayFrame(frame);
+            }
 
             FixedLengthArrayPool<byte>.Return(array);
         }
 
         [Command(channel = Channels.Unreliable)]
-        private void CmdRelayFrame(MirrorFrame frame)
+        private void CmdRelayFrame(MirrorFrame frame, NetworkConnectionToClient sender = null)
         {
+            float additionalLatency = frame.additionalLatency + Time.deltaTime;
+            frame = new(frame.index, frame.timestamp, additionalLatency, frame.data);
             RpcReceiveFrame(frame);
         }
 
@@ -82,7 +94,7 @@ namespace Assets.Metater.MetaVoiceChat.NetProviders.Mirror
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
         private void RpcReceiveFrame(MirrorFrame frame)
         {
-            metaVc.ReceiveFrame(frame.index, frame.timestamp, frame.data);
+            metaVc.ReceiveFrame(frame.index, frame.timestamp, frame.additionalLatency, frame.data);
         }
     }
 }

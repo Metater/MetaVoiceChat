@@ -40,9 +40,7 @@
 
 // TODO Test with low video frame rates
 
-// TODO Determine the minimum follow latency
-
-// TODO Ensure all number units have a single space between
+// Exponential backoff is an alternative to the current jitter calculation
 
 using System;
 using Assets.Metater.MetaVoiceChat.Input;
@@ -136,7 +134,7 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 if (isEchoEnabled)
                 {
-                    ReceiveFrame(index, Timestamp, ReadOnlySpan<byte>.Empty);
+                    ReceiveFrame(index, Timestamp, additionalLatency: 0, ReadOnlySpan<byte>.Empty);
                 }
 
                 netProvider.RelayFrame(index, Timestamp, ReadOnlySpan<byte>.Empty);
@@ -147,43 +145,25 @@ namespace Assets.Metater.MetaVoiceChat
 
                 if (isEchoEnabled)
                 {
-                    ReceiveFrame(index, Timestamp, data);
+                    ReceiveFrame(index, Timestamp, additionalLatency: 0, data);
                 }
 
                 netProvider.RelayFrame(index, Timestamp, data);
             }
         }
 
-        public void ReceiveFrame(int index, double timestamp, ReadOnlySpan<byte> data)
+        public void ReceiveFrame(int index, double timestamp, float additionalLatency, ReadOnlySpan<byte> data)
         {
-            //print($"Data = {data.Length}");
-
-            // TODO Use exponential backoff. Is the jitter stuff even needed?
-
-            // TODO Involve Time.deltaTime in the target latency calculation, maybe just add 1.25  * Time.deltaTime to the target latency??
+            // The 2 should probable be configurable in the config
+            float targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime + additionalLatency;
 
             if (!isLocalPlayer)
             {
                 float jitter = this.jitter.Update(timestamp);
-                print(jitter * 1000);
+                targetLatency += jitter;
+
+                Debug.Log($"Jitter: {(int)(jitter * 1000)} ms");
             }
-
-            float targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime;
-            //if (isLocalPlayer)
-            //{
-            //    // TODO Make this constant a variable?
-            //    //targetLatency = 0.027f;
-
-            //    targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime;
-            //}
-            //else
-            //{
-            //    //targetLatency = Mathf.Max(jitter, 0.032f); // 40 ms seemed to work, 27 ms occasional pauses
-
-            //    targetLatency = config.secondsPerFrame + Time.deltaTime;
-            //}
-
-            //targetLatency *= 1.25f;
 
             if (data.Length == 0)
             {

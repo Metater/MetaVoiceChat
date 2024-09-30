@@ -29,10 +29,9 @@ namespace Assets.Metater.MetaVoiceChat
         [Tooltip("Hints to the encoder the expected signal type. The default is voice.")]
         public OpusSignal signal = OpusSignal.OPUS_SIGNAL_VOICE;
 
-        [Tooltip("The time window in which the RMS of jitter values is calculated. The units are seconds.")]
-        public float jitterWindow = 0.120f;
-        [Tooltip("The default jitter value returned when the jitter buffer is empty. The units are seconds.")]
-        public float jitterDefault = 0.040f;
+        [Tooltip("The time window in which the jitter values are calculated. The units are seconds.")]
+        public float jitterTimeWindow = 0.240f; // 240ms is divisible by 10ms, 20ms, and 40ms
+        public int jitterMeanOffsetWindow = 100;
 
         [NonSerialized] public int framePeriodMs;
         [NonSerialized] public int framesPerSecond;
