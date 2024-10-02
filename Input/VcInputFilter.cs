@@ -4,6 +4,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
 {
     public abstract class VcInputFilter : MonoBehaviour
     {
+        [Tooltip("The next audio input filter in the pipeline. This can be null.")]
         public VcInputFilter nextInputFilter;
 
         /// <summary>

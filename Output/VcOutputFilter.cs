@@ -4,6 +4,7 @@ namespace Assets.Metater.MetaVoiceChat.Output
 {
     public abstract class VcOutputFilter : MonoBehaviour
     {
+        [Tooltip("The next audio output filter in the pipeline. This can be null.")]
         public VcOutputFilter nextOutputFilter;
 
         /// <summary>

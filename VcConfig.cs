@@ -7,8 +7,8 @@ namespace Assets.Metater.MetaVoiceChat
     [Serializable]
     public class VcConfig
     {
-        public const int BitsPerSample = sizeof(short) * 8; // 16
-        public const int SamplesPerSecond = 16000;
+        public const int BitsPerSample = 16;
+        public const int SamplesPerSecond = 16_000;
         public const int ClipLoopSeconds = 1;
         public const int SamplesPerClip = SamplesPerSecond * ClipLoopSeconds;
 
@@ -26,12 +26,19 @@ namespace Assets.Metater.MetaVoiceChat
         [Tooltip("The size of the groups of networked audio samples in milliseconds. The only valid choices are 10ms (160 samples), 20ms (320 samples), and 40ms (640 samples). The default is 20ms (320 samples). Longer frame sizes reduce network traffic but increase susceptibility to dropped packets and introduce more latency in the audio output buffer.")]
         public OpusFramesize framesize = OpusFramesize.OPUS_FRAMESIZE_20_MS;
 
-        [Tooltip("Hints to the encoder the expected signal type. The default is voice.")]
+        [Tooltip("Hints the expected signal type to the encoder. The default is voice.")]
         public OpusSignal signal = OpusSignal.OPUS_SIGNAL_VOICE;
 
-        [Tooltip("The time window in which the jitter values are calculated. The units are seconds.")]
-        public float jitterTimeWindow = 0.240f; // 240ms is divisible by 10ms, 20ms, and 40ms
+        [Tooltip("The time window in which the RMS jitter values are calculated. The units are seconds.")]
+        [Range(0.040f, 1.200f)]
+        public float jitterTimeWindow = 0.240f; // 240ms is divisible by 10ms, 20ms, and 40ms -- does divisibility matter, IDK.
+        [Tooltip("The mean time offset calculation window size used for jitter calculation. The units are updates.")]
+        [Range(10, 1000)]
         public int jitterMeanOffsetWindow = 100;
+
+        [Tooltip("The minimum number of fractional frames that are kept in the output buffer between the read and write positions. Lower means less latency, but too low means the output audio buffer read and write positions may overlap and do strange things. The units are fractional frames.")]
+        [Range(1, 10)]
+        public float outputMinBufferSize = 2.0f;
 
         [NonSerialized] public int framePeriodMs;
         [NonSerialized] public int framesPerSecond;
@@ -51,7 +58,7 @@ namespace Assets.Metater.MetaVoiceChat
                 OpusFramesize.OPUS_FRAMESIZE_60_MS => throw new NotSupportedException("60ms Opus framesize not supported."),
                 OpusFramesize.OPUS_FRAMESIZE_ARG => throw new NotSupportedException("Argument Opus framesize not supported."),
                 OpusFramesize.OPUS_FRAMESIZE_VARIABLE => throw new NotSupportedException("Variable Opus framesize not supported."),
-                _ => throw new NotSupportedException("Unknown Opus framesize found.")
+                _ => throw new NotSupportedException("Unknown Opus framesize encountered.")
             };
 
             framesPerSecond = 1000 / framePeriodMs;

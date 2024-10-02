@@ -11,12 +11,16 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
         [Tooltip("The output audio source.")]
         public UnityEngine.AudioSource audioSource;
         [Tooltip("The time a frame lives in the buffer for before being cleared out. The units are seconds.")]
+        [Range(0.1f, 0.75f)]
         public float frameLifetime = 0.5f;
         [Tooltip("The largest magnitude latency considered negative before wrapping around to positive values. The units are seconds.")]
+        [Range(0.1f, 0.5f)]
         public float maxNegativeLatency = 0.25f;
-        [Tooltip("The proportional gain of the pitch controller. The units are percent per second of latency error.")]
+        [Tooltip("The proportional gain of the pitch P-controller. The units are percent per second of latency error.")]
+        [Range(0, 10)]
         public float pitchProportionalGain = 1;
-        [Tooltip("The maximum increase or decrease in pitch allowed for a correction. The units are percent.")]
+        [Tooltip("The maximum increase or decrease in pitch allowed for corrections. The units are percent.")]
+        [Range(0f, 0.5f)]
         public float pitchMaxCorrection = 0.2f; // Was 0.25 for a while
 
         private int framesPerSecond;

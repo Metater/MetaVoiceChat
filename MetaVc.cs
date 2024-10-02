@@ -35,7 +35,7 @@ namespace Assets.Metater.MetaVoiceChat
         public MetaSerializableReactiveProperty<bool> isInputMuted;
         [Tooltip("This is a remote player that the local player doesn't want to hear.")]
         public MetaSerializableReactiveProperty<bool> isOutputMuted;
-        [Tooltip("This is the local player and they are speaking.")]
+        [Tooltip("This player is speaking or trying to speak.")]
         public MetaSerializableReactiveProperty<bool> isSpeaking;
 
         private INetProvider netProvider;
@@ -49,6 +49,8 @@ namespace Assets.Metater.MetaVoiceChat
 
         private readonly System.Diagnostics.Stopwatch stopwatch = new();
         private double Timestamp => stopwatch.Elapsed.TotalSeconds;
+
+        private bool CannotSpeak => netProvider.IsLocalPlayerDeafened || isOutputMuted;
 
         private void Awake()
         {
@@ -73,7 +75,7 @@ namespace Assets.Metater.MetaVoiceChat
 
             jitter = new(config);
 
-            stopwatch.Restart();
+            stopwatch.Start();
         }
 
         private void SendFrame(int index, float[] samples)
@@ -119,16 +121,13 @@ namespace Assets.Metater.MetaVoiceChat
 
         public void ReceiveFrame(int index, double timestamp, float additionalLatency, ReadOnlySpan<byte> data)
         {
-            // The 2 should probable be configurable in the config
-            float targetLatency = (config.secondsPerFrame * 2f) + Time.deltaTime + additionalLatency;
+            float targetLatency = (config.secondsPerFrame * config.outputMinBufferSize) + Time.deltaTime + additionalLatency;
 
             if (!isLocalPlayer)
             {
                 // Exponential backoff is an alternative to the current jitter calculation, but this works!
                 float jitter = this.jitter.Update(timestamp);
                 targetLatency += jitter;
-
-                //Debug.Log($"Target Latency: {(int)(targetLatency * 1000)} ms");
             }
 
             if (data.Length == 0)
@@ -141,7 +140,7 @@ namespace Assets.Metater.MetaVoiceChat
             {
                 SetIsSpeaking(true);
 
-                if (netProvider.IsLocalPlayerDeafened || isOutputMuted)
+                if (CannotSpeak)
                 {
                     audioOutput.ReceiveAndFilterFrame(index, null, targetLatency);
                 }
@@ -179,9 +178,10 @@ namespace Assets.Metater.MetaVoiceChat
 
         private void SetIsSpeaking(bool value)
         {
-            if (isEchoEnabled && isLocalPlayer)
+            if (isLocalPlayer/* && isEchoEnabled*/)
             {
-                // Return because isSpeaking is already set in SendFrame
+                // If this is a local player, the only way to get here is echo being enabled
+                // Return because isSpeaking is already set in SendFrame for echo mode
                 return;
             }
 

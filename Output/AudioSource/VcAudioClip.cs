@@ -36,7 +36,7 @@ namespace Assets.Metater.MetaVoiceChat.Output.AudioSource
 
             if (samples.Length != samplesPerFrame)
             {
-                throw new Exception("Voice chat audio clip frame length does not match the config!");
+                throw new Exception("Voice chat audio clip samples per frame does not match the config!");
             }
 
             int offsetSamples = samplesPerFrame * offsetFrames;

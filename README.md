@@ -1,17 +1,35 @@
-![MetaVoiceChat Banner](MetaVoiceChat.png)
+![MetaVoiceChat Banner](Images/MetaVoiceChat.png)
 
-&ast; Currently, only Mirror is supported, however other libraries can easily be implemented by composing an agnostic MonoBehaviour and implementing a minimal interface — please feel free to contribute additional network implementations. Please make PRs with your contributions if you feel they would be helpful to the public.
+&ast; Currently, only Mirror is supported, however other libraries can easily be implemented by composing an agnostic MonoBehaviour and implementing a minimal interface — please feel free to contribute additional network provider implementations. Please make PRs with any of your changes or improvements if you feel they would be helpful to the public. Please create issues for things as you see fit.
 
 ## Table of Contents
-- [Thank Yous](#thank-yous)
 - [Installation](#installation)
-- [Features](#information)
+- [Information](#information)
+- [Planned Features](#planned-features)
 - [Tutorial](#tutorial)
-
-TODO Add Concentus locally to this project
+- [Tips](#tips)
+- [Public APIs](#public-apis)
+- [Thank Yous](#thank-yous)
+- [Network Providers](#network-providers)
+- [Direct Improvements Over UniVoice](#direct-improvements-over-univoice)
+- [Missing Things](#missing-things)
+    - [Network Providers](#missing-network-providers)
+    - [Features](#missing-features)
+- [Extending Functionality](#extending-functionality)
+    - [Network Provider](#how-do-i-write-a-network-provider-implementation)
+    - [VcAudioInput](#how-do-i-write-a-vcaudioinput)
+    - [VcAudioOutput](#how-do-i-write-a-vcaudiooutput)
+    - [VcInputFilter](#how-do-i-write-a-vcinputfilter)
+    - [VcOutputFilter](#how-do-i-write-a-vcoutputfilter)
+- [Community Questions](#community-questions)
+- [Games Made with MetaVoiceChat](#games-made-with-metavoicechat)
+- [License](#license)
 
 ## Installation
-1. TODO
+1. On this page, click "<> Code" -> "Download ZIP"
+2. Unzip the ZIP into your Unity "Assets" folder
+    - The "MetaVoiceChat" folder can be moved to anywhere inside of "Assets"
+3. See [Tutorial](#tutorial) for additional steps
 
 ## Information
 - Simple
@@ -19,21 +37,29 @@ TODO Add Concentus locally to this project
     - No user code required and completely self-contained
     - No complicated cloud services required -- everything just works with your existing networking library
 - Configurable
-    - Settings for...
+    - Exposed Opus settings (defaults in bold)
+        - Application: <b>VOIP</b>, Audio, or Restricted Low-Delay
+        - Complexity: 0-<b>10</b> (0 is less complex, while <b>10</b> is more complex)
+        - Frame size: 10ms, <b>20ms</b>, or 40ms
+        - Signal: <b>Voice</b>, Music, or Auto
+    - General settings
+        - Jitter calculation time window size in seconds
+        - Jitter mean time offset calculation window size in updates
+        - Output min buffer size in fractional frames
+    - VcAudioInput settings
+        - First input filter
+    - VcInputFilter settings
+        - Next input filter
+    - VcAudioOutput settings
+        - First output filter
+    - VcOutputFilter settings
+        - Next output filter
     - VcAudioSourceOutput settings
         - Audio source
-        - Frame lifetime
-        - Max negative latency
-        - Pitch proportional gain
-        - Pitch max correction
-    - Exposed Opus settings
-        - Application: VOIP, Audio, or Restricted Low-Delay
-        - Complexity: 0-10
-        - Frame size: 10ms, 20ms, or 40ms
-        - Signal: Voice, Music, or Auto
-    - TODO Jitter
-        - Window size in seconds
-        - Default value in seconds
+        - Buffer frame lifetime in seconds
+        - Buffer max negative latency in seconds
+        - Pitch proportional gain in percent per second of latency error
+        - Pitch max correction in percent
     - Default input is the Unity microphone
     - Default output is a Unity Audio Source
 - Functional
@@ -44,39 +70,38 @@ TODO Add Concentus locally to this project
         - Output muting others
     - Unity microphone wrapper
     - Circular audio clip
-    - RMS jitter calculation utility within a time window and mean offset window using mean deviation
-    - Fixed length array pool utility
+    - RMS jitter calculation utility within a time window and mean time offset window using a mean deviation method
+    - Threadsafe fixed length array pool utility
     - Serializable reactive property utility
 - Modular
     - Abstract VcAudioInput and VcAudioOutput classes
     - Abstract VcInputFilter and VcOutputFilter pipelines
 - Testable
     - Echo mode to playback your own voice
-    - Sine wave override mode
+    - Sine wave voice override mode
 - Details
     - No memory garbage created at runtime using pooled data buffers
-    - Fixed 16kHz sampling frequency
-    - Fixed wideband Opus bandwidth
-    - Fixed SILK Opus mode
-    - Fixed single audio channel
-    - Fixed 16-bit audio
-    - Fixed 1 second input and output audio clip loop time
-    - Average latency is ~(250-300)ms with defaults (Unity's crappy microphone is to blame for ~200ms)
-    - Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender, and receiver FPS adjustments
+    - Constants
+        - 16kHz sampling frequency
+        - Wideband Opus bandwidth
+        - SILK Opus mode
+        - Single audio channel
+        - 16-bit audio
+        - 1 second input and output audio clip loop time
+    - Average latency is ~250-300ms with default settings (Unity's high-latency microphone is to blame for ~200ms of this)
+    - Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender FPS, server/host FPS, and receiver FPS adjustments
 - Opus features
     - Variable bitrate encoding
-    - Many exposed settings
-- TODO FILL IN OTHER FEATURES
-- TODO Set default values for everything
-- TODO Add tooltips to all settings (Check audio input and output mic and audio sources)
+    - [Opus Official Website](https://opus-codec.org/)
 
-### Planned Features
+## Planned Features
 - Voice activation detection and latching
 - Push to talk
 - UI for settings and indicators with hooks and an official implementation that saves to PlayerPrefs
-- Abstract selection system for configuring voice chat settings for particular clients that the local player wants to configure
+- Abstract selection system for configuring voice chat settings for particular clients the local player chooses
 
 ## Tutorial
+- Note: This is specifically for the Mirror network provider, however the steps will be similar for other network providers.
 1. TODO
 2. Output Audio Source Configuration
     - Place the audio source on the player prefab in the mouth area
@@ -91,7 +116,8 @@ TODO Add Concentus locally to this project
 
 ## Tips
 - Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"
-- Chain together input and ouput filters to form pipelines by using the first and next filter fields
+- Apply input and output filters to audio inputs and outputs by using the first filter fields
+- Chain together input and ouput filters to form pipelines by using the next filter fields
 
 ## Public APIs
 ```cs
@@ -119,7 +145,7 @@ public class VcMic : IDisposable
 
 ### Another thank you to [Concentus: Opus for Everyone](https://github.com/lostromb/concentus) for their native C# implementation of Opus that makes it extremely easy to add Opus to projects like this.
 
-## Implementations
+## Network Providers
 - [Mirror](https://github.com/MirrorNetworking/Mirror)
 
 ## Direct Improvements Over [UniVoice](https://github.com/adrenak/univoice)
@@ -130,7 +156,7 @@ public class VcMic : IDisposable
 
 ## Missing Things
 
-### Missing Implementations
+### Missing Network Providers
 - [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/)
 - [LiteNetLib](https://github.com/RevenantX/LiteNetLib)
 - [LiteEntitySystem](https://github.com/RevenantX/LiteEntitySystem)
@@ -156,17 +182,17 @@ public class VcMic : IDisposable
         - Forward error correction
     - Multiple chat rooms
 
-## Writing Extensions
+## Extending Functionality
 
-### How do I write a network implementation?
+### How do I write a network provider implementation?
 - TODO
 
 ### How do I write a VcAudioInput?
-- Ideas: transmit an audio file or in-game audio
+- Ideas for you: transmit an audio file or in-game audio
 - TODO
 
 ### How do I write a VcAudioOutput?
-- Ideas: save audio or do speech-to-text
+- Ideas for you: save audio or do speech-to-text
 - TODO
 
 ### How do I write a VcInputFilter?
@@ -180,16 +206,21 @@ public class VcMic : IDisposable
 - How can vulnerabilities be found and compensated for?
 
 ## Games Made with MetaVoiceChat
-- TODO Bomb Bois Steam page URL
 
 ## License
 This project is licensed under the [MIT License](LICENSE)
 
 ## To-Do
-- Post on Reddit and Mirror Discord to advertise
-- Add ranges to configurable values
-- Finish checking MetaVc.cs
-- Finish checking VcConfig.cs
+- Bomb Bois Steam page URL under "Games Made with MetaVoiceChat"
+- Tutorial
 
-# Ideas
-- Text chat implementation with UI?
+## Advertising
+- Discord
+    - Mirror
+    - LiteNetLib
+    - Code Monkey
+- Reddit
+    - Unity3D
+
+## Ideas
+- Abstract text chat implementation with UI

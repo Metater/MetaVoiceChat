@@ -6,6 +6,7 @@ namespace Assets.Metater.MetaVoiceChat.Input
     public abstract class VcAudioInput : MonoBehaviour
     {
         public MetaVc metaVc;
+        [Tooltip("The first audio input filter in the pipeline. This can be null.")]
         public VcInputFilter firstInputFilter;
 
         public event Action<int, float[]> OnFrameReady;
