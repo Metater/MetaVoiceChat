@@ -19,15 +19,27 @@ namespace Assets.Metater.MetaVoiceChat
 {
     public class MetaVc : MonoBehaviour
     {
+        private const string CodecTimeOverrunMessage = "Opus codec took too long this frame. It is recommended to decrease Opus complexity until this message is rare as long as you have a sensible max codec ms value chosen to maintain your desired fps.";
+
+        [Header("General")]
+
         public VcAudioInput audioInput;
         public VcAudioOutput audioOutput;
         public VcConfig config;
 
+        [Header("Testing")]
+
         [Tooltip("This plays back the voice of the local player.")]
         public bool isEchoEnabled;
-
         [Tooltip("This overwrites the audio input with a 200 Hz sine wave at 20% volume.")]
-        public bool isSineEnabled;
+        public bool isSineOverrideEnabled;
+        [Tooltip("The maximum time allowed per frame in milliseconds for all Opus encoding and decoding before giving a warning. This helps you ensure that the Opus codec is not limiting your fps. Disable the warnings by increasing this to its max.")]
+        [Range(0, 100)]
+        public float maxCodecMilliseconds = 50;
+        [Tooltip("This allows multiple codec time overrun warnings per frame.")]
+        public bool allowMultipleCodecWarningsPerFrame;
+
+        [Header("Serializable Reactive Properties")]
 
         [Tooltip("This is the local player and they don't want to hear anyone else.")]
         public MetaSerializableReactiveProperty<bool> isDeafened;
@@ -52,9 +64,13 @@ namespace Assets.Metater.MetaVoiceChat
 
         private bool CannotSpeak => netProvider.IsLocalPlayerDeafened || isOutputMuted;
 
+        private static readonly FrameStopwatch codecStopwatch = new();
+
         private void Awake()
         {
             config.Init();
+
+            codecStopwatch.Reset();
         }
 
         public void StartClient(INetProvider netProvider, bool isLocalPlayer, int maxDataBytesPerPacket)
@@ -80,7 +96,7 @@ namespace Assets.Metater.MetaVoiceChat
 
         private void SendFrame(int index, float[] samples)
         {
-            if (samples != null && isSineEnabled)
+            if (samples != null && isSineOverrideEnabled)
             {
                 const float Amplitude = 0.2f;
 
@@ -108,7 +124,10 @@ namespace Assets.Metater.MetaVoiceChat
             }
             else
             {
+                bool hasEncodedYet = encoder.HasEncodedYet;
+                codecStopwatch.Start();
                 var data = encoder.EncodeFrame(samples.AsSpan());
+                codecStopwatch.Stop(maxCodecMilliseconds, CodecTimeOverrunMessage, !hasEncodedYet, allowMultipleCodecWarningsPerFrame);
 
                 if (isEchoEnabled)
                 {
@@ -146,7 +165,10 @@ namespace Assets.Metater.MetaVoiceChat
                 }
                 else
                 {
+                    bool hasDecodedYet = decoder.HasDecodedYet;
+                    codecStopwatch.Start();
                     var samples = decoder.DecodeFrame(data);
+                    codecStopwatch.Stop(maxCodecMilliseconds, CodecTimeOverrunMessage, !hasDecodedYet, allowMultipleCodecWarningsPerFrame);
 
                     if (samples.Length == config.samplesPerFrame)
                     {

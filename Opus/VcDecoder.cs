@@ -10,6 +10,8 @@ namespace Assets.Metater.MetaVoiceChat.Opus
 
         public string Version => opusDecoder.GetVersionString();
 
+        public bool HasDecodedYet { get; private set; } = false;
+
         public VcDecoder(VcConfig config)
         {
             opusDecoder = OpusCodecFactory.CreateDecoder(VcConfig.SamplesPerSecond, numChannels: 1);
@@ -21,6 +23,8 @@ namespace Assets.Metater.MetaVoiceChat.Opus
 
         public ReadOnlySpan<float> DecodeFrame(ReadOnlySpan<byte> data, bool decodeFec = false)
         {
+            HasDecodedYet = true;
+
             int samplesDecoded = opusDecoder.Decode(data, buffer, buffer.Length, decodeFec);
             return buffer.AsSpan(0, samplesDecoded);
         }

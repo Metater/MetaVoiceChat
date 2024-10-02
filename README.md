@@ -26,10 +26,10 @@
 - [License](#license)
 
 ## Installation
-1. On this page, click "<> Code" -> "Download ZIP"
-2. Unzip the ZIP into your Unity "Assets" folder
-    - The "MetaVoiceChat" folder can be moved to anywhere inside of "Assets"
-3. See [Tutorial](#tutorial) for additional steps
+1. On this page, click "<> Code" -> "Download ZIP".
+2. Unzip the ZIP into your Unity "Assets" folder.
+    - The "MetaVoiceChat" folder can be moved to anywhere inside of "Assets".
+3. See [Tutorial](#tutorial) for additional steps.
 
 ## Information
 - Simple
@@ -40,7 +40,7 @@
     - Exposed Opus settings (defaults in bold)
         - Application: <b>VOIP</b>, Audio, or Restricted Low-Delay
         - Complexity: 0-<b>10</b> (0 is less complex, while <b>10</b> is more complex)
-        - Frame size: 10ms, <b>20ms</b>, or 40ms
+        - Frame size: 10 ms, <b>20 ms</b>, or 40 ms
         - Signal: <b>Voice</b>, Music, or Auto
     - General settings
         - Jitter calculation time window size in seconds
@@ -71,14 +71,17 @@
     - Unity microphone wrapper
     - Circular audio clip
     - RMS jitter calculation utility within a time window and mean time offset window using a mean deviation method
-    - Threadsafe fixed length array pool utility
+    - Thread-safe fixed length array pool utility
     - Serializable reactive property utility
+    - Frame stopwatch utility
 - Modular
     - Abstract VcAudioInput and VcAudioOutput classes
     - Abstract VcInputFilter and VcOutputFilter pipelines
 - Testable
     - Echo mode to playback your own voice
     - Sine wave voice override mode
+    - Max codec milliseconds before warning
+        - These warnings are limited to once per frame by default
 - Details
     - No memory garbage created at runtime using pooled data buffers
     - Constants
@@ -88,7 +91,7 @@
         - Single audio channel
         - 16-bit audio
         - 1 second input and output audio clip loop time
-    - Average latency is ~250-300ms with default settings (Unity's high-latency microphone is to blame for ~200ms of this)
+    - Average latency is ~250-300 ms with default settings (Unity's high-latency microphone is to blame for ~200 ms of this)
     - Dynamic buffer latency compensation using a latency error P-controller with RMS jitter, sender FPS, server/host FPS, and receiver FPS adjustments
 - Opus features
     - Variable bitrate encoding
@@ -101,23 +104,40 @@
 - Abstract selection system for configuring voice chat settings for particular clients the local player chooses
 
 ## Tutorial
-- Note: This is specifically for the Mirror network provider, however the steps will be similar for other network providers.
-1. TODO
-2. Output Audio Source Configuration
-    - Place the audio source on the player prefab in the mouth area
-    - "Output" = the voice chat audio mixer group
+1. Ensure you have properly completed the [installation](#installation) steps.
+2. Create a "Voice Chat" or similarly named game object as a child of your networked player game object or other networked game object that you would like to have networked audio on.
+3. Add the "MetaVc" component to the "Voice Chat" game object.
+4. Add your desired audio input, such as "VcMicAudioInput" to the game object.
+5. Likewise, add your desired audio output, such as "VcAudioSourceOutput" to the game object.
+6. Connect your audio input and output to the "MetaVc" fields.
+7. Lastly, add your desired network provider, such as "MirrorNetProvider" to the game object.
+8. It should look something like this now: ![TutorialA](Images/TutorialA.png)
+    - All of these defaults should be okay, however you may want to decrease the "Complexity" field for games with many concurrently connected users or lower-end devices.
+    - Remember to use "Max Codec Milliseconds" to ensure that your complexity value is not too high for your game.
+        - Note: The codec performs sluggishly in bursts, so set this value higher than your desired frame period and ensure warnings are not being spammed and then increase it back to the max to disable it when you are done testing.
+    - Use "Allow Multiple Codec Warnings Per Frame" to ensure you get the total frame time used by the codec when there are warnings.
+9. Create a "Voice Chat Output" or similarly named Audio Source game object as a child of the networked game object. If this is a player, it should be in the mouth area.
+10. Configure the output Audio Source
+    - "Output" = the voice chat audio mixer group (optional)
     - "Play On Awake" = false
     - "Loop" is set to true internally, so don't worry
-    - "Spacial Blend" = 1 for 3D proximity chat
+    - "Spacial Blend" = 1 for 3D proximity chat and 0 for normal voice chat
     - "3D Sound Settings"
-        - "Doppler Level" is set to zero internally, so don't worry (it must be zero because of how Unity implements this)
+        - "Doppler Level" is set to 0 internally, so don't worry (It must be 0 because of how Unity implements this)
         - "Max Distance" = ~50 meters or whatever you think is best
-        - Ensure the volume rolloff curve's last datapoint has a volume of zero
+        - Ensure the volume roll-off curve's last data point has a volume of zero.
+    - Your general settings should look like this: ![TutorialB](Images/TutorialB.png)
+    - Your 3D sound settings should look like this: ![TutorialC](Images/TutorialC.png)
+11. Connect your voice chat output Audio Source to the "Audio Source" field under the "Vc Audio Source Output" component.
+12. Connect the "Meta Vc" fields under your audio input and output to the "Meta Vc" sibling component.
+13. At this point, the "Voice Chat" game object should look like this: ![TutorialD](Images/TutorialD.png)
+14. You are done!!! See [tips](#tips) below for more.
 
 ## Tips
 - Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"
 - Apply input and output filters to audio inputs and outputs by using the first filter fields
-- Chain together input and ouput filters to form pipelines by using the next filter fields
+- Chain together input and output filters to form pipelines by using the next filter fields
+- A frame size of 10 ms is useful for achieving lower latency on higher-end devices with high network send rates for all users. A frame size of 40 ms is useful for optimization on lower-end devices and networks, but this negatively impacts ear-to-ear latency and worsens the audio quality when packets are dropped. A frame size of 20 ms is a good balance.
 
 ## Public APIs
 ```cs
@@ -169,9 +189,9 @@ public class VcMic : IDisposable
 - Example scene
 - Configurable sampling rates
 - Multithreading for Opus
-- Compared to [Dissonace Voice Chat](https://assetstore.unity.com/packages/tools/audio/dissonance-voice-chat-70078)
+- Compared to [Dissonance Voice Chat](https://assetstore.unity.com/packages/tools/audio/dissonance-voice-chat-70078)
     - Audio preprocessing
-        - Noise supression
+        - Noise suppression
         - Dynamic range compression
         - Automatic gain control
     - Audio postprocessing

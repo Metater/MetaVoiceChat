@@ -21,6 +21,8 @@ namespace Assets.Metater.MetaVoiceChat.Opus
 
         public string Version => opusEncoder.GetVersionString();
 
+        public bool HasEncodedYet { get; private set; } = false;
+
         public VcEncoder(VcConfig config, int maxDataBytesPerPacket)
         {
             // 1275 is the maximum packet size for Opus
@@ -51,6 +53,8 @@ namespace Assets.Metater.MetaVoiceChat.Opus
 
         public ReadOnlySpan<byte> EncodeFrame(ReadOnlySpan<float> samples)
         {
+            HasEncodedYet = true;
+
             int bytesEncoded = opusEncoder.Encode(samples, frameSize, buffer, buffer.Length);
             return buffer.AsSpan(0, bytesEncoded);
         }
