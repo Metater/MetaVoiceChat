@@ -226,13 +226,12 @@ public class VcMic : IDisposable
 - How can vulnerabilities be found and compensated for?
 
 ## Games Made with MetaVoiceChat
+- My own WIP game "Bomb Bois". I am still getting the public Steam page up.
 
 ## License
 This project is licensed under the [MIT License](LICENSE)
 
 ## To-Do
-- Bomb Bois Steam page URL under "Games Made with MetaVoiceChat"
-- Tutorial
 
 ## Advertising
 - Discord
