@@ -229,7 +229,9 @@ public class VcMic : IDisposable
 - My own WIP game "Bomb Bois". I am still getting the public Steam page up.
 
 ## License
-This project is licensed under the [MIT License](LICENSE)
+- This project is licensed under the [MIT License](LICENSE)
+- You are technically permitted to sell this project exactly as it is under the MIT license, but please don't. Just share this project for free with others that would like to use it.
+- Now go and make great games, whether for profit or free, using this! Please share links to your projects -- I would love to see what you all make!
 
 ## To-Do
 
