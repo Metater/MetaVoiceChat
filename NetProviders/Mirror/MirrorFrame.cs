@@ -1,4 +1,4 @@
-#if !UNITY_SERVER
+#if MIRROR && !UNITY_SERVER
 using System;
 using Mirror;
 using UnityEngine;
