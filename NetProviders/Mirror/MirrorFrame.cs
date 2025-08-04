@@ -1,6 +1,4 @@
-// THE USER MUST REMOVE #if MIRROR WHEN USING SERVER BUILDS
-
-#if MIRROR
+#if !UNITY_SERVER
 using System;
 using Mirror;
 using UnityEngine;
