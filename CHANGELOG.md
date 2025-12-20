@@ -1,3 +1,6 @@
+12/20/2025 (v4.2):
+- MirrorNetProvider: Fix null reference if a player joins late with incoming audio frames #21. Thanks @EterniumDev
+
 10/27/2025 (v4.1):
 - Fix VcAudioSourceOutput non-deterministic initialization order bug that caused NREs. Thanks @ctxpower on Discord!
 
