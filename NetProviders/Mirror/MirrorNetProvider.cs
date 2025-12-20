@@ -95,6 +95,9 @@ namespace MetaVoiceChat.NetProviders.Mirror
         [ClientRpc(channel = Channels.Unreliable, includeOwner = false)]
         private void RpcReceiveFrame(MirrorFrame frame)
         {
+            if (MetaVc == null)
+                return;
+        
             if (isServer)
             {
                 // Don't apply server Time.deltaTime to additionalLatency -- this frame did not go over the network again.
