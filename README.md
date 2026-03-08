@@ -1,3 +1,8 @@
+## Contact and Support
+- Discord: metater
+- Support in my Discord server: https://discord.gg/k4ZtGAA2Nt
+    - Just post in #meta-voice-chat-support and ping me
+
 ![MetaVoiceChat Banner](Images/MetaVoiceChat.png)
 
 ## Supported Networking Solutions
