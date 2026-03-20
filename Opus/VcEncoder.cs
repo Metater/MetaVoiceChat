@@ -28,6 +28,10 @@ namespace MetaVoiceChat.Opus
             // 1275 is the maximum packet size for Opus
             maxDataBytesPerPacket = Math.Min(maxDataBytesPerPacket, 1275);
 
+#if ENABLE_IL2CPP
+            OpusCodecFactory.AttemptToUseNativeLibrary = false;
+
+#endif
             opusEncoder = OpusCodecFactory.CreateEncoder(VcConfig.SamplesPerSecond, numChannels: 1, config.application);
 
             opusEncoder.Bandwidth = VcConfig.Bandwidth;

@@ -14,6 +14,10 @@ namespace MetaVoiceChat.Opus
 
         public VcDecoder(VcConfig config)
         {
+#if ENABLE_IL2CPP
+            OpusCodecFactory.AttemptToUseNativeLibrary = false;
+
+#endif
             opusDecoder = OpusCodecFactory.CreateDecoder(VcConfig.SamplesPerSecond, numChannels: 1);
 
             //opusDecoder.Gain
