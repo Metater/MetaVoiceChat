@@ -15,7 +15,7 @@ namespace MetaVoiceChat.NetProviders.Netick
         public static IReadOnlyList<NetickNetProvider> Instances => instances;
         #endregion
 
-        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.MetaVc.isDeafened;
+        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance != null && LocalPlayerInstance.MetaVc.isDeafened;
 
         public MetaVc MetaVc { get; private set; }
 
@@ -78,16 +78,20 @@ namespace MetaVoiceChat.NetProviders.Netick
 
         void INetProvider.RelayFrame(int index, double timestamp, ReadOnlySpan<byte> data)
         {
+            if (VoiceDataTransmitter == null)
+            {
+                Debug.LogError("[MetaVoiceChat] MetaVoiceChatNetick component is missing from the Sandbox prefab.");
+                return;
+            }
+
             float additionalLatency = GetAdditionalLatency();
 
             if (Sandbox.IsServer)
             {
-                //send the data to all clients
                 VoiceDataTransmitter.SendServerVoiceToClients(index, timestamp, additionalLatency, data, playerID);
             }
             else
             {
-                //send the data from client to server
                 VoiceDataTransmitter.SendVoiceDataToServer(index, timestamp, additionalLatency, data);
             }
         }
