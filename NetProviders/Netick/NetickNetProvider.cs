@@ -88,10 +88,12 @@ namespace MetaVoiceChat.NetProviders.Netick
 
             if (Sandbox.IsServer)
             {
+                //send the data to all clients
                 VoiceDataTransmitter.SendServerVoiceToClients(index, timestamp, additionalLatency, data, playerID);
             }
             else
             {
+                //send the data from client to server
                 VoiceDataTransmitter.SendVoiceDataToServer(index, timestamp, additionalLatency, data);
             }
         }
