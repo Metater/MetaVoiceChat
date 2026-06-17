@@ -1,3 +1,5 @@
+#define META_VOICE_CHAT_AUDIO_LOGGING
+
 using System;
 using UnityEngine;
 
@@ -17,11 +19,11 @@ namespace MetaVoiceChat.Core
         [SerializeField, Min(0)] private int prerollFramesOnFirstUpdate = 6;
 
         [Header("Frame")]
-        [SerializeField, Min(1000)] private int inputSampleRate = 48000;
+        [SerializeField] private int inputSampleRate = 48000;
         [SerializeField, Range(1, 2)] private int inputChannels = 1;
         [SerializeField, Min(1)] private int frameDurationMs = 10;
-        [SerializeField] private ulong initialFrameIndex;
         [SerializeField] private ushort initialSequenceNumber;
+        [SerializeField] private uint initialTimestamp;
 
         [Header("Sine")]
         [SerializeField, Min(0f)] private float frequencyHz = 440f;
@@ -39,8 +41,10 @@ namespace MetaVoiceChat.Core
 
         [Header("Debug")]
         [SerializeField] private bool exposeRuntimeLatency;
+#if META_VOICE_CHAT_AUDIO_LOGGING
         [SerializeField] private bool logGeneratorDiagnostics = true;
         [SerializeField, Min(0.1f)] private float generatorDiagnosticsLogIntervalSeconds = 1f;
+#endif
         [SerializeField] private int currentNetEqBufferMs;
         [SerializeField] private int receiveToEarLatencyMs;
 
@@ -49,12 +53,14 @@ namespace MetaVoiceChat.Core
         private double frameAccumulator;
         private double leftPhase;
         private double rightPhase;
-        private ulong frameIndex;
         private ushort sequenceNumber;
+        private uint timestamp;
         private bool isFeeding;
         private int pendingPrerollFrames;
+#if META_VOICE_CHAT_AUDIO_LOGGING
         private int sentFrameCount;
         private float nextGeneratorDiagnosticsLogTime;
+#endif
 
         public bool IsFeeding
         {
@@ -79,8 +85,8 @@ namespace MetaVoiceChat.Core
             frameAccumulator = 0.0;
             leftPhase = 0.0;
             rightPhase = DegreesToRadians(rightChannelPhaseOffsetDegrees);
-            frameIndex = initialFrameIndex;
             sequenceNumber = initialSequenceNumber;
+            timestamp = initialTimestamp;
             pendingPrerollFrames = prerollFramesOnFirstUpdate;
         }
 
@@ -100,8 +106,8 @@ namespace MetaVoiceChat.Core
             }
             else
             {
-                frameIndex = initialFrameIndex;
                 sequenceNumber = initialSequenceNumber;
+                timestamp = initialTimestamp;
                 pendingPrerollFrames = prerollFramesOnFirstUpdate;
             }
 
@@ -121,7 +127,9 @@ namespace MetaVoiceChat.Core
                 receiveToEarLatencyMs = output.GetReceiveToEarLatencyMs();
             }
 
+#if META_VOICE_CHAT_AUDIO_LOGGING
             LogGeneratorDiagnosticsIfNeeded();
+#endif
 
             if (!feedInUpdate || !isFeeding)
             {
@@ -170,7 +178,7 @@ namespace MetaVoiceChat.Core
 
         private void OnValidate()
         {
-            inputSampleRate = Math.Max(1000, inputSampleRate);
+            inputSampleRate = ClosestSupportedSampleRate(inputSampleRate);
             inputChannels = Mathf.Clamp(inputChannels, 1, 2);
             if (twoChannelDifferentSines)
             {
@@ -180,7 +188,9 @@ namespace MetaVoiceChat.Core
             frameDurationMs = Math.Max(1, frameDurationMs);
             maxFramesPerUpdate = Math.Max(1, maxFramesPerUpdate);
             prerollFramesOnFirstUpdate = Math.Max(0, prerollFramesOnFirstUpdate);
+#if META_VOICE_CHAT_AUDIO_LOGGING
             generatorDiagnosticsLogIntervalSeconds = Math.Max(0.1f, generatorDiagnosticsLogIntervalSeconds);
+#endif
             amplitude = Mathf.Clamp01(amplitude);
             dcOffset = Mathf.Clamp(dcOffset, -1f, 1f);
             rightChannelPhaseOffsetDegrees = Mathf.Clamp(rightChannelPhaseOffsetDegrees, -180f, 180f);
@@ -200,7 +210,7 @@ namespace MetaVoiceChat.Core
 
         private void CacheValidatedSettings(out int sampleRate, out int channels, out int frameSamplesPerChannel)
         {
-            sampleRate = Math.Max(1000, inputSampleRate);
+            sampleRate = ClosestSupportedSampleRate(inputSampleRate);
             channels = twoChannelDifferentSines ? 2 : Math.Clamp(inputChannels, 1, 2);
             frameSamplesPerChannel = Math.Max(1, sampleRate * Math.Max(1, frameDurationMs) / 1000);
         }
@@ -221,12 +231,14 @@ namespace MetaVoiceChat.Core
                 frameSize,
                 sampleRate,
                 channels,
-                frameIndex,
-                sequenceNumber);
+                sequenceNumber,
+                timestamp);
 
-            frameIndex++;
             sequenceNumber++;
+            timestamp = unchecked(timestamp + (uint)frameSamplesPerChannel);
+#if META_VOICE_CHAT_AUDIO_LOGGING
             sentFrameCount++;
+#endif
         }
 
         private float[] EnsureFrameBuffer(int frameSize)
@@ -296,6 +308,24 @@ namespace MetaVoiceChat.Core
             return degrees * Math.PI / 180.0;
         }
 
+        private static int ClosestSupportedSampleRate(int sampleRate)
+        {
+            int closest = SupportedSampleRates[0];
+            int closestDistance = Math.Abs(sampleRate - closest);
+            for (int i = 1; i < SupportedSampleRates.Length; i++)
+            {
+                int distance = Math.Abs(sampleRate - SupportedSampleRates[i]);
+                if (distance < closestDistance)
+                {
+                    closest = SupportedSampleRates[i];
+                    closestDistance = distance;
+                }
+            }
+
+            return closest;
+        }
+
+#if META_VOICE_CHAT_AUDIO_LOGGING
         private void LogGeneratorDiagnosticsIfNeeded()
         {
             if (!logGeneratorDiagnostics || Time.unscaledTime < nextGeneratorDiagnosticsLogTime)
@@ -315,7 +345,9 @@ namespace MetaVoiceChat.Core
                 $"frequency={frequencyHz:0.##} amplitude={amplitude:0.###}",
                 this);
         }
+#endif
 
         private const double TwoPi = Math.PI * 2.0;
+        private static readonly int[] SupportedSampleRates = { 8000, 16000, 32000, 48000 };
     }
 }
