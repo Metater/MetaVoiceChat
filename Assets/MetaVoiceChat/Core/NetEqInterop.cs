@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -11,6 +12,8 @@ namespace MetaVoiceChat.Core
 #else
         private const string LibraryName = "meta_voice_chat_neteq";
 #endif
+
+        private static IntPtr loadedNativeLibrary;
 
         public sealed class Instance : IDisposable
         {
@@ -142,6 +145,64 @@ namespace MetaVoiceChat.Core
                 minDelayMs,
                 additionalDelayMs);
         }
+
+        public static void PreloadNativeLibrary(string assetsPath)
+        {
+#if (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN) && !UNITY_IOS
+            if (Volatile.Read(ref loadedNativeLibrary) != IntPtr.Zero)
+            {
+                return;
+            }
+
+            string architecture =
+#if UNITY_EDITOR
+                IntPtr.Size == 8 ? "x86_64" : "x86";
+#elif UNITY_64
+                "x86_64";
+#else
+                "x86";
+#endif
+
+            string pluginPath = Path.Combine(
+                assetsPath,
+                "MetaVoiceChat",
+                "Core",
+                "Plugins",
+                "meta-voice-chat-neteq",
+                "Windows",
+                architecture,
+                "meta_voice_chat_neteq.dll");
+
+            if (!File.Exists(pluginPath))
+            {
+                return;
+            }
+
+            IntPtr handle = LoadLibrary(pluginPath);
+            if (handle == IntPtr.Zero)
+            {
+                throw new DllNotFoundException(
+                    $"Failed to load '{pluginPath}'. Windows error {Marshal.GetLastWin32Error()}.");
+            }
+
+            IntPtr previous = Interlocked.CompareExchange(ref loadedNativeLibrary, handle, IntPtr.Zero);
+            if (previous != IntPtr.Zero)
+            {
+                FreeLibrary(handle);
+            }
+#else
+            _ = assetsPath;
+#endif
+        }
+
+#if (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN) && !UNITY_IOS
+        [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibrary(string lpFileName);
+
+        [DllImport("kernel32", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FreeLibrary(IntPtr hModule);
+#endif
 
         [DllImport(LibraryName, EntryPoint = "create_neteq", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr create_neteq(

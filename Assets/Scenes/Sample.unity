@@ -443,6 +443,7 @@ GameObject:
   - component: {fileID: 1511361414}
   - component: {fileID: 1511361415}
   - component: {fileID: 1511361416}
+  - component: {fileID: 1511361417}
   m_Layer: 0
   m_Name: Audio Source
   m_TagString: Untagged
@@ -476,7 +477,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6311868c720e83247bb201129a36896d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetEqOnAudioFilterRead
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcOutput
+  audioFilterReadConfig: {fileID: 11400000, guid: 4767797422a28634ea36a91d1788f473, type: 2}
+  pendingFrameCapacity: 256
+  createPlaybackClip: 1
+  logDiagnostics: 1
+  diagnosticsLogIntervalSeconds: 1
 --- !u!82 &1511361416
 AudioSource:
   m_ObjectHideFlags: 0
@@ -492,12 +498,12 @@ AudioSource:
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
-  Loop: 0
+  Loop: 1
   Mute: 0
   Spatialize: 0
   SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 1
+  Priority: 0
+  DopplerLevel: 0
   MinDistance: 1
   MaxDistance: 500
   Pan2D: 0
@@ -534,7 +540,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -574,6 +580,45 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &1511361417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1511361413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d56e2f2b3fcc44a9a783be8cecea1e92, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.TestOnAudioFilterReadVcOutput
+  feedOnEnable: 1
+  feedInUpdate: 1
+  feedInFixedUpdate: 0
+  sendSilence: 0
+  sendNullSilenceFrames: 1
+  maxFramesPerUpdate: 32
+  prerollFramesOnFirstUpdate: 0
+  inputSampleRate: 48000
+  inputChannels: 1
+  frameDurationMs: 20
+  initialFrameIndex: 0
+  initialSequenceNumber: 0
+  frequencyHz: 440
+  amplitude: 0.2
+  dcOffset: 0
+  rightChannelPhaseOffsetDegrees: 0
+  rightChannelFrequencyMultiplier: 1
+  resetPhaseOnEnable: 1
+  twoChannelDifferentSines: 0
+  rightChannelFrequencyHz: 440
+  rightChannelAmplitude: 0.2
+  rightChannelDcOffset: 0
+  exposeRuntimeLatency: 0
+  logGeneratorDiagnostics: 1
+  generatorDiagnosticsLogIntervalSeconds: 1
+  currentNetEqBufferMs: 0
+  receiveToEarLatencyMs: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
