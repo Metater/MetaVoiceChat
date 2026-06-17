@@ -1,6 +1,6 @@
 {
-    "name": "MetaVoiceChat.Algos",
-    "rootNamespace": "MetaVoiceChat.Algos",
+    "name": "MetaVoiceChat.Core",
+    "rootNamespace": "MetaVoiceChat.Core",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

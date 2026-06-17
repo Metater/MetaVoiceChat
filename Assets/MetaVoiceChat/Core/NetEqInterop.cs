@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace MetaVoiceChat
+namespace MetaVoiceChat.Core
 {
     public static class NetEqInterop
     {
