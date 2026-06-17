@@ -13,10 +13,10 @@ namespace MetaVoiceChat.Core
         [SerializeField] private int resamplerBufferMs = OnAudioFilterReadVcOutput.DefaultResamplerBufferMs;
 
         [Header("NetEq Settings")]
-        public int maxPacketsInBuffer = OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer;
-        public uint maxDelayMs = OnAudioFilterReadVcOutput.DefaultMaxDelayMs;
-        public uint minDelayMs = OnAudioFilterReadVcOutput.DefaultMinDelayMs;
-        public uint additionalDelayMs = OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs;
+        [Range(1, 256)] public int maxPacketsInBuffer = OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer;
+        [Range(0, 1000)] public uint maxDelayMs = OnAudioFilterReadVcOutput.DefaultMaxDelayMs;
+        [Range(0, 1000)] public uint minDelayMs = OnAudioFilterReadVcOutput.DefaultMinDelayMs;
+        [Range(0, 1000)] public uint additionalDelayMs = OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs;
 
         public int ResamplerBufferMs
         {

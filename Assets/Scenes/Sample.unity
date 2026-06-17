@@ -480,9 +480,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcOutput
   audioFilterReadConfig: {fileID: 11400000, guid: 4767797422a28634ea36a91d1788f473, type: 2}
   pendingFrameCapacity: 32
-  createPlaybackClip: 1
-  logDiagnostics: 1
-  diagnosticsLogIntervalSeconds: 1
 --- !u!82 &1511361416
 AudioSource:
   m_ObjectHideFlags: 0
@@ -501,7 +498,7 @@ AudioSource:
   Loop: 1
   Mute: 0
   Spatialize: 0
-  SpatializePostEffects: 1
+  SpatializePostEffects: 0
   Priority: 0
   DopplerLevel: 0
   MinDistance: 1
@@ -602,8 +599,8 @@ MonoBehaviour:
   inputSampleRate: 48000
   inputChannels: 1
   frameDurationMs: 10
-  initialFrameIndex: 0
   initialSequenceNumber: 0
+  initialTimestamp: 0
   frequencyHz: 440
   amplitude: 0.2
   dcOffset: 0
@@ -615,8 +612,6 @@ MonoBehaviour:
   rightChannelAmplitude: 0.2
   rightChannelDcOffset: 0
   exposeRuntimeLatency: 0
-  logGeneratorDiagnostics: 1
-  generatorDiagnosticsLogIntervalSeconds: 1
   currentNetEqBufferMs: 0
   receiveToEarLatencyMs: 0
 --- !u!1660057539 &9223372036854775807

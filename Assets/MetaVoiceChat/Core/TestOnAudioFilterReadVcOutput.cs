@@ -1,4 +1,4 @@
-#define META_VOICE_CHAT_AUDIO_LOGGING
+//#define LOG_TestOnAudioFilterReadVcOutput
 
 using System;
 using UnityEngine;
@@ -41,7 +41,7 @@ namespace MetaVoiceChat.Core
 
         [Header("Debug")]
         [SerializeField] private bool exposeRuntimeLatency;
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
         [SerializeField] private bool logGeneratorDiagnostics = true;
         [SerializeField, Min(0.1f)] private float generatorDiagnosticsLogIntervalSeconds = 1f;
 #endif
@@ -57,7 +57,7 @@ namespace MetaVoiceChat.Core
         private uint timestamp;
         private bool isFeeding;
         private int pendingPrerollFrames;
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
         private int sentFrameCount;
         private float nextGeneratorDiagnosticsLogTime;
 #endif
@@ -127,7 +127,7 @@ namespace MetaVoiceChat.Core
                 receiveToEarLatencyMs = output.GetReceiveToEarLatencyMs();
             }
 
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
             LogGeneratorDiagnosticsIfNeeded();
 #endif
 
@@ -188,7 +188,7 @@ namespace MetaVoiceChat.Core
             frameDurationMs = Math.Max(1, frameDurationMs);
             maxFramesPerUpdate = Math.Max(1, maxFramesPerUpdate);
             prerollFramesOnFirstUpdate = Math.Max(0, prerollFramesOnFirstUpdate);
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
             generatorDiagnosticsLogIntervalSeconds = Math.Max(0.1f, generatorDiagnosticsLogIntervalSeconds);
 #endif
             amplitude = Mathf.Clamp01(amplitude);
@@ -236,7 +236,7 @@ namespace MetaVoiceChat.Core
 
             sequenceNumber++;
             timestamp = unchecked(timestamp + (uint)frameSamplesPerChannel);
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
             sentFrameCount++;
 #endif
         }
@@ -325,7 +325,7 @@ namespace MetaVoiceChat.Core
             return closest;
         }
 
-#if META_VOICE_CHAT_AUDIO_LOGGING
+#if LOG_TestOnAudioFilterReadVcOutput
         private void LogGeneratorDiagnosticsIfNeeded()
         {
             if (!logGeneratorDiagnostics || Time.unscaledTime < nextGeneratorDiagnosticsLogTime)
