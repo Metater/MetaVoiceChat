@@ -9,7 +9,7 @@ using UnityEngine;
 namespace MetaVoiceChat.Core
 {
     [RequireComponent(typeof(AudioSource))]
-    public sealed class OnAudioFilterReadVcOutput : MonoBehaviour
+    public sealed class OnAudioFilterReadVcOutput : MonoBehaviour, IVcOutput
     {
         // NetEQ constants
         public const int DefaultMaxPacketsInBuffer = 16;
@@ -107,11 +107,6 @@ namespace MetaVoiceChat.Core
             get { return Volatile.Read(ref currentBufferSizeMs); }
         }
 
-        public int GetReceiveToEarLatencyMs()
-        {
-            return GetEstimatedLocalReceiveToDspLatencyMs();
-        }
-
         public int GetEstimatedLocalReceiveToDspLatencyMs()
         {
             int pendingMs = GetOldestPendingFrameAgeMs();
@@ -123,7 +118,7 @@ namespace MetaVoiceChat.Core
                 Volatile.Read(ref cachedDspBufferMs);
         }
 
-        public void ReceiveFrame(
+        public void Process(
             ReadOnlySpan<float> frame,
             int frameSize,
             int inputFrequency,

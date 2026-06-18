@@ -124,7 +124,7 @@ namespace MetaVoiceChat.Core
             if (exposeRuntimeLatency && output != null)
             {
                 currentNetEqBufferMs = output.CurrentBufferSizeMs;
-                receiveToEarLatencyMs = output.GetReceiveToEarLatencyMs();
+                receiveToEarLatencyMs = output.GetEstimatedLocalReceiveToDspLatencyMs();
             }
 
 #if LOG_TestOnAudioFilterReadVcOutput
@@ -227,7 +227,7 @@ namespace MetaVoiceChat.Core
                 frame = frameArray;
             }
 
-            output.ReceiveFrame(
+            output.Process(
                 frame,
                 frameSize,
                 sampleRate,

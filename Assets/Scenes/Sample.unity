@@ -478,7 +478,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6311868c720e83247bb201129a36896d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcOutput
-  audioFilterReadConfig: {fileID: 11400000, guid: 4767797422a28634ea36a91d1788f473, type: 2}
+  audioFilterReadConfig: {fileID: 11400000, guid: aebcb14547b50c844b41ab5add804b9e, type: 2}
 --- !u!82 &1511361416
 AudioSource:
   m_ObjectHideFlags: 0
@@ -595,7 +595,7 @@ MonoBehaviour:
   sendNullSilenceFrames: 1
   maxFramesPerUpdate: 32
   prerollFramesOnFirstUpdate: 0
-  inputSampleRate: 48000
+  inputSampleRate: 8000
   inputChannels: 1
   frameDurationMs: 10
   initialSequenceNumber: 0

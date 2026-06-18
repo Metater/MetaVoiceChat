@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bd7f4cc945035fd4090f47b121787cf0, type: 3}
-  m_Name: Default OnAudioFilterRead VC Config
+  m_Name: Low Latency OnAudioFilterRead VC Config
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcConfig
   resamplerQuality: 4
   resamplerBufferMs: 5
-  maxPacketsInBuffer: 16
-  maxDelayMs: 150
-  minDelayMs: 20
+  maxPacketsInBuffer: 8
+  maxDelayMs: 80
+  minDelayMs: 10
   additionalDelayMs: 0
