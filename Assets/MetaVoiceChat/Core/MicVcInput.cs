@@ -1,7 +1,6 @@
 //#define LOG_MicVcInput
 
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -13,15 +12,14 @@ namespace MetaVoiceChat.Core
         public const int InputChannels = 1;
         public const int ClipLoopSeconds = 1;
 
-        public const float DefaultReconnectInitialDelay = 0.25f;
+        public const float DefaultReconnectInitialDelay = 0.5f;
         public const float DefaultReconnectPollInterval = 1f;
         public const float DefaultReconnectFailureTimeout = 2f;
-        public const float MinimumReconnectPollInterval = 0.05f;
-        public const float MinimumReconnectFailureTimeout = 0.1f;
+        public const float MinimumReconnectPollInterval = 0.25f;
+        public const float MinimumReconnectFailureTimeout = 0.5f;
 
         private const VcFrequency DefaultFrequency = VcFrequency.Hz48000;
         private const VcMilliseconds DefaultMilliseconds = VcMilliseconds.Ms20;
-        private const int MaxPooledArraysPerLength = 4;
 
         [Header("Voice Pipeline")]
         [Tooltip("Pipeline that receives mono microphone frames. The frame array is reused every call, so processors should copy data immediately if they need to keep it.")]
@@ -50,16 +48,10 @@ namespace MetaVoiceChat.Core
         [SerializeField] private bool exposeRuntimeDiagnostics = true;
 
         [SerializeField, HideInInspector] private string runtimeActiveDevice = string.Empty;
-        [SerializeField, HideInInspector] private int runtimeRequestedFrequency;
-        [SerializeField, HideInInspector] private int runtimeActualFrequency;
-        [SerializeField, HideInInspector] private int runtimeFrameSize;
-        [SerializeField, HideInInspector] private int runtimeReadBufferSize;
         [SerializeField, HideInInspector] private int runtimeAvailableSamples;
         [SerializeField, HideInInspector] private int runtimeFramesSent;
         [SerializeField, HideInInspector] private int runtimeDroppedSamples;
 #endif
-
-        private readonly FloatArrayPool arrayPool = new FloatArrayPool(MaxPooledArraysPerLength);
 
         private AudioClip audioClip;
         private string activeDevice = string.Empty;
@@ -86,7 +78,6 @@ namespace MetaVoiceChat.Core
         private float nextOverrunWarningTime;
 #endif
         private float[] readBuffer = Array.Empty<float>();
-        private float[] frameBuffer = Array.Empty<float>();
         private ushort sequenceNumber;
         private uint timestamp;
 
@@ -232,7 +223,6 @@ namespace MetaVoiceChat.Core
 
             ValidateSerializedSettings();
             ApplyFrameSettings();
-            CacheRuntimeDiagnostics();
         }
 
         private void OnEnable()
@@ -242,7 +232,6 @@ namespace MetaVoiceChat.Core
             ApplyFrameSettings();
             if (!Application.isPlaying)
             {
-                CacheRuntimeDiagnostics();
                 return;
             }
 
@@ -273,14 +262,12 @@ namespace MetaVoiceChat.Core
             reconnectRequested = false;
             StopRecordingInternal(resetActiveDevice: true);
             ReleaseCaptureBuffers();
-            arrayPool.Clear();
         }
 
         private void Update()
         {
             if (!Application.isPlaying)
             {
-                CacheRuntimeDiagnostics();
                 return;
             }
 
@@ -301,7 +288,6 @@ namespace MetaVoiceChat.Core
                 if (reconnectRequested || (autoReconnect && ShouldReconnect()))
                 {
                     ReconnectNow();
-                    CacheRuntimeDiagnostics();
                     return;
                 }
 
@@ -312,8 +298,6 @@ namespace MetaVoiceChat.Core
             {
                 StartRecordingInternal(scheduleReconnectOnFailure: true);
             }
-
-            CacheRuntimeDiagnostics();
         }
 
         private void OnValidate()
@@ -322,7 +306,6 @@ namespace MetaVoiceChat.Core
             if (!Application.isPlaying)
             {
                 ApplyFrameSettings();
-                CacheRuntimeDiagnostics();
             }
         }
 
@@ -409,7 +392,7 @@ namespace MetaVoiceChat.Core
             isRecording = true;
             ResetReadStateToCurrentMicrophonePosition();
             ResetFrameClock();
-            EnsureFrameBuffer();
+            EnsureReadBuffer();
             nextReconnectAttemptTime = float.PositiveInfinity;
             return true;
         }
@@ -559,17 +542,21 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
-            float[] samples = EnsureReadBuffer(readableSamples);
-            int offsetSamples = PositiveModulo(readAbsolutePosition, clipSamples);
-            if (!audioClip.GetData(samples, offsetSamples))
+            EnsureReadBuffer();
+            while (readableSamples >= frameSize)
             {
-                LogReadFailureWarning();
-                HandleAutomaticReconnectNeeded();
-                return;
-            }
+                int offsetSamples = PositiveModulo(readAbsolutePosition, clipSamples);
+                if (!audioClip.GetData(readBuffer, offsetSamples))
+                {
+                    LogReadFailureWarning();
+                    HandleAutomaticReconnectNeeded();
+                    return;
+                }
 
-            DispatchFrames(samples, readableSamples);
-            readAbsolutePosition += readableSamples;
+                DispatchFrames(readBuffer, frameSize);
+                readAbsolutePosition += frameSize;
+                readableSamples -= frameSize;
+            }
         }
 
         private void DispatchFrames(float[] samples, int sampleCount)
@@ -581,17 +568,17 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
-            EnsureFrameBuffer();
-            for (int offset = 0; offset + frameSize <= sampleCount; offset += frameSize)
+            if (sampleCount < frameSize)
             {
-                Array.Copy(samples, offset, frameBuffer, 0, frameSize);
-                pipeline.Process(frameBuffer, frameSize, actualFrequency, InputChannels, sequenceNumber, timestamp);
-                sequenceNumber = unchecked((ushort)(sequenceNumber + 1));
-                timestamp = unchecked(timestamp + (uint)frameSize);
-#if LOG_MicVcInput
-                runtimeFramesSent++;
-#endif
+                return;
             }
+
+            pipeline.Process(samples, frameSize, actualFrequency, InputChannels, sequenceNumber, timestamp);
+            sequenceNumber = unchecked((ushort)(sequenceNumber + 1));
+            timestamp = unchecked(timestamp + (uint)frameSize);
+#if LOG_MicVcInput
+            runtimeFramesSent++;
+#endif
         }
 
         private long GetCurrentAbsoluteMicrophonePosition()
@@ -655,47 +642,25 @@ namespace MetaVoiceChat.Core
             if (frameSize != nextFrameSize)
             {
                 frameSize = nextFrameSize;
-                ReturnBuffer(ref frameBuffer);
+                readBuffer = Array.Empty<float>();
             }
 
-            EnsureFrameBuffer();
+            EnsureReadBuffer();
         }
 
-        private void EnsureFrameBuffer()
+        private void EnsureReadBuffer()
         {
-            if (frameSize <= 0 || frameBuffer.Length == frameSize)
+            if (frameSize <= 0 || readBuffer.Length == frameSize)
             {
                 return;
             }
 
-            ReturnBuffer(ref frameBuffer);
-            frameBuffer = arrayPool.Rent(frameSize);
-        }
-
-        private float[] EnsureReadBuffer(int requiredLength)
-        {
-            if (readBuffer.Length == requiredLength)
-            {
-                return readBuffer;
-            }
-
-            ReturnBuffer(ref readBuffer);
-            readBuffer = arrayPool.Rent(requiredLength);
-            return readBuffer;
+            readBuffer = new float[frameSize];
         }
 
         private void ReleaseCaptureBuffers()
         {
-            ReturnBuffer(ref readBuffer);
-            ReturnBuffer(ref frameBuffer);
-#if LOG_MicVcInput
-            runtimeReadBufferSize = 0;
-#endif
-        }
-
-        private void ReturnBuffer(ref float[] buffer)
-        {
-            arrayPool.Return(ref buffer);
+            readBuffer = Array.Empty<float>();
         }
 
         private string ResolveDevice()
@@ -759,26 +724,6 @@ namespace MetaVoiceChat.Core
                 ? Math.Max(MinimumReconnectFailureTimeout, micVcConfig.reconnectFailureTimeout)
                 : DefaultReconnectFailureTimeout;
         }
-
-#if LOG_MicVcInput
-        private void CacheRuntimeDiagnostics()
-        {
-            if (!exposeRuntimeDiagnostics && Application.isPlaying)
-            {
-                return;
-            }
-
-            runtimeActiveDevice = activeDevice;
-            runtimeRequestedFrequency = requestedFrequency;
-            runtimeActualFrequency = actualFrequency;
-            runtimeFrameSize = frameSize;
-            runtimeReadBufferSize = readBuffer.Length;
-        }
-#else
-        private void CacheRuntimeDiagnostics()
-        {
-        }
-#endif
 
         private void LogNoDeviceWarning()
         {
@@ -915,59 +860,6 @@ namespace MetaVoiceChat.Core
             }
 
             return (int)result;
-        }
-
-        private sealed class FloatArrayPool
-        {
-            private readonly Dictionary<int, Stack<float[]>> arraysByLength = new Dictionary<int, Stack<float[]>>();
-            private readonly int maxArraysPerLength;
-
-            public FloatArrayPool(int maxArraysPerLength)
-            {
-                this.maxArraysPerLength = Math.Max(1, maxArraysPerLength);
-            }
-
-            public float[] Rent(int length)
-            {
-                if (length <= 0)
-                {
-                    return Array.Empty<float>();
-                }
-
-                if (arraysByLength.TryGetValue(length, out Stack<float[]> arrays) && arrays.Count > 0)
-                {
-                    return arrays.Pop();
-                }
-
-                return new float[length];
-            }
-
-            public void Return(ref float[] buffer)
-            {
-                float[] returned = buffer;
-                buffer = Array.Empty<float>();
-
-                if (returned == null || returned.Length == 0)
-                {
-                    return;
-                }
-
-                if (!arraysByLength.TryGetValue(returned.Length, out Stack<float[]> arrays))
-                {
-                    arrays = new Stack<float[]>();
-                    arraysByLength.Add(returned.Length, arrays);
-                }
-
-                if (arrays.Count < maxArraysPerLength)
-                {
-                    arrays.Push(returned);
-                }
-            }
-
-            public void Clear()
-            {
-                arraysByLength.Clear();
-            }
         }
     }
 }

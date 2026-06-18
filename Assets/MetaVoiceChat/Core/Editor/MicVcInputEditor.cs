@@ -8,7 +8,7 @@ namespace MetaVoiceChat.Core.Editor
     [CanEditMultipleObjects]
     public sealed class MicVcInputEditor : UnityEditor.Editor
     {
-        private const float RecommendedMinimumReconnectPollInterval = 0.25f;
+        private const float RecommendedMinimumReconnectPollInterval = MicVcInput.MinimumReconnectPollInterval;
         private const float RecommendedMaximumReconnectPollInterval = 5f;
         private const float RecommendedMaximumReconnectFailureTimeout = 5f;
 
@@ -126,7 +126,7 @@ namespace MetaVoiceChat.Core.Editor
 
             DrawPanel(
                 "Fixed Clip Loop",
-                $"Unity Microphone is always started with Loop on and a {MicVcInput.ClipLoopSeconds} second clip. The read buffer grows and shrinks to the largest available whole-frame read.",
+                $"Unity Microphone is always started with Loop on and a {MicVcInput.ClipLoopSeconds} second clip. The read buffer stays at one frame and GetData is called once per available frame.",
                 MessageType.Info);
         }
 
@@ -166,13 +166,14 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Default Reconnect Settings",
-                    $"No config asset is assigned. Auto reconnect is enabled with {MicVcInput.DefaultReconnectPollInterval:0.##} second polling and {MicVcInput.DefaultReconnectFailureTimeout:0.##} second failure retries.",
+                    $"No config asset is assigned. Auto reconnect is enabled with a {MicVcInput.DefaultReconnectInitialDelay:0.##} second initial delay, {MicVcInput.DefaultReconnectPollInterval:0.##} second device polling, and {MicVcInput.DefaultReconnectFailureTimeout:0.##} second failure retries.",
                     MessageType.Info);
                 return;
             }
 
             using SerializedObject serializedConfig = new SerializedObject(config);
             SerializedProperty autoReconnect = serializedConfig.FindProperty("autoReconnect");
+            SerializedProperty reconnectInitialDelay = serializedConfig.FindProperty("reconnectInitialDelay");
             SerializedProperty reconnectPollInterval = serializedConfig.FindProperty("reconnectPollInterval");
             SerializedProperty reconnectFailureTimeout = serializedConfig.FindProperty("reconnectFailureTimeout");
 
@@ -187,12 +188,21 @@ namespace MetaVoiceChat.Core.Editor
 
             float pollInterval = reconnectPollInterval != null ? reconnectPollInterval.floatValue : 0f;
             float failureTimeout = reconnectFailureTimeout != null ? reconnectFailureTimeout.floatValue : 0f;
+            float initialDelay = reconnectInitialDelay != null ? reconnectInitialDelay.floatValue : 0f;
 
-            if (pollInterval > 0f && pollInterval < RecommendedMinimumReconnectPollInterval)
+            if (initialDelay < 0f)
+            {
+                DrawPanel(
+                    "Invalid Initial Delay",
+                    "Reconnect Initial Delay is below 0 seconds. The runtime clamps it to 0, but the config asset should be corrected.",
+                    MessageType.Error);
+            }
+
+            if (pollInterval < MicVcInput.MinimumReconnectPollInterval)
             {
                 DrawPanel(
                     "Very Fast Polling",
-                    $"Reconnect Poll Interval is below {RecommendedMinimumReconnectPollInterval:0.##} seconds. This is responsive, but can repeatedly query Unity Microphone while devices are unplugged.",
+                    $"Reconnect Poll Interval is below {RecommendedMinimumReconnectPollInterval:0.##} seconds. The runtime clamps it upward to avoid repeatedly querying Unity Microphone too aggressively.",
                     MessageType.Warning);
             }
             else if (pollInterval > RecommendedMaximumReconnectPollInterval)
@@ -200,6 +210,14 @@ namespace MetaVoiceChat.Core.Editor
                 DrawPanel(
                     "Slow Reconnect Polling",
                     $"Reconnect Poll Interval is above {RecommendedMaximumReconnectPollInterval:0.##} seconds. Newly plugged microphones may take a while to become active.",
+                    MessageType.Warning);
+            }
+
+            if (failureTimeout < MicVcInput.MinimumReconnectFailureTimeout)
+            {
+                DrawPanel(
+                    "Very Fast Failure Retry",
+                    $"Reconnect Failure Timeout is below {MicVcInput.MinimumReconnectFailureTimeout:0.##} seconds. The runtime clamps it upward so Unity has time to recover after a failed microphone start.",
                     MessageType.Warning);
             }
 
