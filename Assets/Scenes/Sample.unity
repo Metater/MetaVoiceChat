@@ -602,7 +602,7 @@ MonoBehaviour:
   initialSequenceNumber: 0
   initialTimestamp: 0
   frequencyHz: 440
-  amplitude: 0.2
+  amplitude: 0.3
   dcOffset: 0
   rightChannelPhaseOffsetDegrees: 0
   rightChannelFrequencyMultiplier: 1
