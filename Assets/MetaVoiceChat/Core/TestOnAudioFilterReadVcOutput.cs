@@ -218,12 +218,13 @@ namespace MetaVoiceChat.Core
         private void SendFrame(int sampleRate, int channels, int frameSamplesPerChannel)
         {
             int frameSize = frameSamplesPerChannel * channels;
-            float[] frame = null;
+            ReadOnlySpan<float> frame = ReadOnlySpan<float>.Empty;
 
             if (!sendSilence || !sendNullSilenceFrames)
             {
-                frame = EnsureFrameBuffer(frameSize);
-                FillFrame(frame, frameSamplesPerChannel, sampleRate, channels, !sendSilence);
+                float[] frameArray = EnsureFrameBuffer(frameSize);
+                FillFrame(frameArray, frameSamplesPerChannel, sampleRate, channels, !sendSilence);
+                frame = frameArray;
             }
 
             output.ReceiveFrame(

@@ -124,7 +124,7 @@ namespace MetaVoiceChat.Core
         }
 
         public void ReceiveFrame(
-            float[] frame,
+            ReadOnlySpan<float> frame,
             int frameSize,
             int inputFrequency,
             int inputChannels,
@@ -144,7 +144,7 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
-            bool isSilence = frame == null;
+            bool isSilence = frame.IsEmpty;
             if (!isSilence && frame.Length < frameSize)
             {
 #if LOG_OnAudioFilterReadVcOutput
@@ -168,7 +168,7 @@ namespace MetaVoiceChat.Core
                 if (!isSilence)
                 {
                     pendingFrame.EnsureCapacity(frameSize);
-                    Array.Copy(frame, 0, pendingFrame.Samples, 0, frameSize);
+                    frame.Slice(0, frameSize).CopyTo(pendingFrame.Samples);
                 }
 
                 pendingFrame.SampleLength = frameSize;

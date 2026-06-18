@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Default OnAudioFilterRead VC Config
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcConfig
   resamplerQuality: 4
-  resamplerBufferMs: 10
+  resamplerBufferMs: 5
   maxPacketsInBuffer: 16
   maxDelayMs: 150
   minDelayMs: 20

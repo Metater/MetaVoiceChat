@@ -173,7 +173,7 @@ namespace MetaVoiceChat.Core.Editor
 
             if (resamplerBufferMs != null)
             {
-                int roundedResamplerBuffer = Mathf.Clamp((resamplerBuffer + 5) / 10 * 10, 10, 100);
+                int roundedResamplerBuffer = Mathf.Clamp((resamplerBuffer + 2) / 5 * 5, 5, 100);
                 if (resamplerBuffer != roundedResamplerBuffer)
                 {
                     DrawPanel(
@@ -276,7 +276,7 @@ namespace MetaVoiceChat.Core.Editor
             int dspMs = outputSampleRate > 0 ? bufferLength * numBuffers * 1000 / outputSampleRate : 0;
             int callbackMs = outputSampleRate > 0 ? bufferLength * 1000 / outputSampleRate : 0;
 
-            if (dspMs > 100)
+            if (dspMs > 40)
             {
                 DrawPanel(
                     "High DSP Buffer Latency",
