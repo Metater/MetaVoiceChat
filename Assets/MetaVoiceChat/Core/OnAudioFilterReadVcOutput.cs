@@ -126,7 +126,7 @@ namespace MetaVoiceChat.Core
         public void ReceiveFrame(
             float[] frame,
             int frameSize,
-            int inputSampleRate,
+            int inputFrequency,
             int inputChannels,
             ushort sequenceNumber,
             uint timestamp)
@@ -136,7 +136,7 @@ namespace MetaVoiceChat.Core
 #endif
 
             if (Volatile.Read(ref acceptingFrames) == 0 ||
-                !IsValidFrameShape(frameSize, inputSampleRate, inputChannels))
+                !IsValidFrameShape(frameSize, inputFrequency, inputChannels))
             {
 #if LOG_OnAudioFilterReadVcOutput
                 Interlocked.Increment(ref droppedInvalidFrameCount);
@@ -172,7 +172,7 @@ namespace MetaVoiceChat.Core
                 }
 
                 pendingFrame.SampleLength = frameSize;
-                pendingFrame.InputSampleRate = inputSampleRate;
+                pendingFrame.InputSampleRate = inputFrequency;
                 pendingFrame.InputChannels = inputChannels;
                 pendingFrame.SequenceNumber = sequenceNumber;
                 pendingFrame.Timestamp = timestamp;
