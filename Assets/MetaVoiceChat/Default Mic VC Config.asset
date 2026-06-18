@@ -16,3 +16,4 @@ MonoBehaviour:
   reconnectInitialDelay: 0.25
   reconnectPollInterval: 1
   reconnectFailureTimeout: 2
+  deviceRefreshInterval: 1

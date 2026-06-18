@@ -11,9 +11,27 @@ namespace MetaVoiceChat.Core.Editor
         private const float RecommendedMinimumReconnectPollInterval = MicVcInput.MinimumReconnectPollInterval;
         private const float RecommendedMaximumReconnectPollInterval = 5f;
         private const float RecommendedMaximumReconnectFailureTimeout = 5f;
+        private const float RecommendedMinimumDeviceRefreshInterval = MicVcInput.MinimumDeviceRefreshInterval;
+        private const float RecommendedMaximumDeviceRefreshInterval = 5f;
+
+        private string[] editorDevices = Array.Empty<string>();
+        private double nextEditorDeviceRefreshTime;
+
+        private void OnEnable()
+        {
+            RefreshEditorDevices(forceRepaint: false);
+            EditorApplication.update += OnEditorUpdate;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.update -= OnEditorUpdate;
+        }
 
         public override void OnInspectorGUI()
         {
+            RefreshEditorDevices(forceRepaint: false);
+
             serializedObject.Update();
             DrawPropertiesExcluding(serializedObject, "selectedDevice");
             DrawSelectedDeviceDropdown();
@@ -31,7 +49,7 @@ namespace MetaVoiceChat.Core.Editor
                 return;
             }
 
-            string[] devices = Microphone.devices ?? Array.Empty<string>();
+            string[] devices = editorDevices;
             string[] labels = BuildDeviceLabels(devices, selectedDevice.stringValue, out int selectedIndex);
 
             EditorGUI.showMixedValue = selectedDevice.hasMultipleDifferentValues;
@@ -80,7 +98,7 @@ namespace MetaVoiceChat.Core.Editor
 
             DrawPipelinePanels(input);
             DrawFramePanels(input);
-            DrawDevicePanels(input);
+            DrawDevicePanels(input, editorDevices);
             DrawReconnectPanels(input);
             DrawRuntimePanels(input);
         }
@@ -108,7 +126,7 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Disabled Pipeline",
-                    "The assigned pipeline component is disabled. Frames are still passed to Process, but this is usually not the intended setup.",
+                    "The assigned pipeline component is disabled, so captured frames will be discarded until it is enabled.",
                     MessageType.Info);
             }
         }
@@ -130,9 +148,8 @@ namespace MetaVoiceChat.Core.Editor
                 MessageType.Info);
         }
 
-        private static void DrawDevicePanels(MicVcInput input)
+        private static void DrawDevicePanels(MicVcInput input, string[] devices)
         {
-            string[] devices = Microphone.devices ?? Array.Empty<string>();
             if (devices.Length == 0)
             {
                 DrawPanel(
@@ -166,7 +183,7 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Default Reconnect Settings",
-                    $"No config asset is assigned. Auto reconnect is enabled with a {MicVcInput.DefaultReconnectInitialDelay:0.##} second initial delay, {MicVcInput.DefaultReconnectPollInterval:0.##} second device polling, and {MicVcInput.DefaultReconnectFailureTimeout:0.##} second failure retries.",
+                    $"No config asset is assigned. Auto reconnect is enabled with a {MicVcInput.DefaultReconnectInitialDelay:0.##} second initial delay, {MicVcInput.DefaultReconnectPollInterval:0.##} second no-device retry interval, {MicVcInput.DefaultReconnectFailureTimeout:0.##} second failure retries, and {MicVcInput.DefaultDeviceRefreshInterval:0.##} second device list refreshes.",
                     MessageType.Info);
                 return;
             }
@@ -176,6 +193,7 @@ namespace MetaVoiceChat.Core.Editor
             SerializedProperty reconnectInitialDelay = serializedConfig.FindProperty("reconnectInitialDelay");
             SerializedProperty reconnectPollInterval = serializedConfig.FindProperty("reconnectPollInterval");
             SerializedProperty reconnectFailureTimeout = serializedConfig.FindProperty("reconnectFailureTimeout");
+            SerializedProperty deviceRefreshInterval = serializedConfig.FindProperty("deviceRefreshInterval");
 
             if (autoReconnect != null && !autoReconnect.boolValue)
             {
@@ -189,6 +207,7 @@ namespace MetaVoiceChat.Core.Editor
             float pollInterval = reconnectPollInterval != null ? reconnectPollInterval.floatValue : 0f;
             float failureTimeout = reconnectFailureTimeout != null ? reconnectFailureTimeout.floatValue : 0f;
             float initialDelay = reconnectInitialDelay != null ? reconnectInitialDelay.floatValue : 0f;
+            float refreshInterval = deviceRefreshInterval != null ? deviceRefreshInterval.floatValue : 0f;
 
             if (initialDelay < 0f)
             {
@@ -202,14 +221,14 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Very Fast Polling",
-                    $"Reconnect Poll Interval is below {RecommendedMinimumReconnectPollInterval:0.##} seconds. The runtime clamps it upward to avoid repeatedly querying Unity Microphone too aggressively.",
+                    $"Reconnect Poll Interval is below {RecommendedMinimumReconnectPollInterval:0.##} seconds. The runtime clamps it upward to avoid retrying failed no-device starts too aggressively.",
                     MessageType.Warning);
             }
             else if (pollInterval > RecommendedMaximumReconnectPollInterval)
             {
                 DrawPanel(
                     "Slow Reconnect Polling",
-                    $"Reconnect Poll Interval is above {RecommendedMaximumReconnectPollInterval:0.##} seconds. Newly plugged microphones may take a while to become active.",
+                    $"Reconnect Poll Interval is above {RecommendedMaximumReconnectPollInterval:0.##} seconds. No-device retry attempts may take a while.",
                     MessageType.Warning);
             }
 
@@ -228,6 +247,26 @@ namespace MetaVoiceChat.Core.Editor
                     $"Reconnect Failure Timeout is above {RecommendedMaximumReconnectFailureTimeout:0.##} seconds. A transient Unity start failure may take a while to recover.",
                     MessageType.Warning);
             }
+
+            if (deviceRefreshInterval == null)
+            {
+                return;
+            }
+
+            if (refreshInterval < MicVcInput.MinimumDeviceRefreshInterval)
+            {
+                DrawPanel(
+                    "Very Fast Device Refresh",
+                    $"Device Refresh Interval is below {RecommendedMinimumDeviceRefreshInterval:0.##} seconds. The runtime clamps it upward to avoid querying Unity Microphone devices too aggressively.",
+                    MessageType.Warning);
+            }
+            else if (refreshInterval > RecommendedMaximumDeviceRefreshInterval)
+            {
+                DrawPanel(
+                    "Slow Device Refresh",
+                    $"Device Refresh Interval is above {RecommendedMaximumDeviceRefreshInterval:0.##} seconds. Newly plugged microphones may take a while to appear.",
+                    MessageType.Warning);
+            }
         }
 
         private static void DrawRuntimePanels(MicVcInput input)
@@ -241,7 +280,7 @@ namespace MetaVoiceChat.Core.Editor
             string activeDevice = string.IsNullOrEmpty(input.ActiveDevice) ? "none" : input.ActiveDevice;
             DrawPanel(
                 "Runtime State",
-                $"Recording: {input.IsRecording}. Active device: {activeDevice}. Actual frequency: {input.ActualFrequency} Hz. Frame size: {input.FrameSize}. Read buffer: {input.ReadBufferSize}. Available samples: {input.AvailableSamples}. Frames sent: {input.FramesSent}. Dropped samples: {input.DroppedSamples}.",
+                $"State: {input.State}. Recording: {input.IsRecording}. Active device: {activeDevice}. Actual frequency: {input.ActualFrequency} Hz. Frame size: {input.FrameSize}. Read buffer: {input.ReadBufferSize}. Available samples: {input.AvailableSamples}. Frames sent: {input.FramesSent}. Dropped samples: {input.DroppedSamples}.",
                 MessageType.Info);
 #else
             _ = input;
@@ -328,6 +367,69 @@ namespace MetaVoiceChat.Core.Editor
         private static void DrawPanel(string title, string message, MessageType messageType)
         {
             EditorGUILayout.HelpBox($"{title}\n{message}", messageType);
+        }
+
+        private void OnEditorUpdate()
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (now < nextEditorDeviceRefreshTime)
+            {
+                return;
+            }
+
+            RefreshEditorDevices(forceRepaint: true);
+        }
+
+        private void RefreshEditorDevices(bool forceRepaint)
+        {
+            editorDevices ??= Array.Empty<string>();
+
+            string[] nextDevices = Microphone.devices ?? Array.Empty<string>();
+            bool changed = !AreDeviceListsEqual(editorDevices, nextDevices);
+            editorDevices = nextDevices;
+            nextEditorDeviceRefreshTime = EditorApplication.timeSinceStartup + GetEditorDeviceRefreshInterval();
+
+            if (forceRepaint && changed)
+            {
+                Repaint();
+            }
+        }
+
+        private float GetEditorDeviceRefreshInterval()
+        {
+            float interval = MicVcInput.DefaultDeviceRefreshInterval;
+            foreach (UnityEngine.Object targetObject in targets)
+            {
+                if (targetObject is MicVcInput input)
+                {
+                    interval = Math.Min(interval, input.DeviceRefreshInterval);
+                }
+            }
+
+            return Math.Max(MicVcInput.MinimumDeviceRefreshInterval, interval);
+        }
+
+        private static bool AreDeviceListsEqual(string[] left, string[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

@@ -1,25 +1,42 @@
 //#define LOG_MicVcInput
 
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 
 namespace MetaVoiceChat.Core
 {
+    public enum MicInputState
+    {
+        Stopped,
+        WaitingForPermission,
+        PermissionDenied,
+        NoDevices,
+        Starting,
+        Recording,
+        StartFailed,
+        DeviceLost
+    }
+
     [DisallowMultipleComponent]
     public sealed class MicVcInput : MonoBehaviour
     {
         public const int InputChannels = 1;
-        public const int ClipLoopSeconds = 1;
+        public const int ClipLoopSeconds = 3;
 
         public const float DefaultReconnectInitialDelay = 0.5f;
         public const float DefaultReconnectPollInterval = 1f;
         public const float DefaultReconnectFailureTimeout = 2f;
+        public const float DefaultDeviceRefreshInterval = 1f;
         public const float MinimumReconnectPollInterval = 0.25f;
         public const float MinimumReconnectFailureTimeout = 0.5f;
+        public const float MinimumDeviceRefreshInterval = 0.25f;
 
         private const VcFrequency DefaultFrequency = VcFrequency.Hz48000;
         private const VcMilliseconds DefaultMilliseconds = VcMilliseconds.Ms20;
+        private const float PositionStallStartupGraceSeconds = 1f;
+        private const float PositionStallTimeoutSeconds = 2f;
 
         [Header("Voice Pipeline")]
         [Tooltip("Pipeline that receives mono microphone frames. The frame array is reused every call, so processors should copy data immediately if they need to keep it.")]
@@ -42,6 +59,9 @@ namespace MetaVoiceChat.Core
         [Tooltip("Invoked when the active microphone device changes. The value is empty when no microphone is active.")]
         [SerializeField] private UnityEvent<string> onActiveDeviceChanged = new UnityEvent<string>();
 
+        [Tooltip("Invoked when the microphone input state changes.")]
+        [SerializeField] private UnityEvent<MicInputState> onStateChanged = new UnityEvent<MicInputState>();
+
 #if LOG_MicVcInput
         [Header("Runtime Diagnostics")]
         [Tooltip("Shows live capture values in the inspector while playing.")]
@@ -60,15 +80,21 @@ namespace MetaVoiceChat.Core
         private bool isRecording;
         private bool reconnectRequested;
         private bool positionInitialized;
+        private MicInputState state = MicInputState.Stopped;
         private int requestedFrequency;
         private int actualFrequency;
         private int frameMilliseconds;
         private int frameSize;
         private int clipSamples;
         private int previousMicrophonePosition;
+        private int lastObservedPosition;
         private long completedClipLoops;
         private long readAbsolutePosition;
+        private float recordingStartTime;
+        private float lastPositionAdvanceTime;
         private float nextReconnectAttemptTime;
+        private float nextDeviceRefreshTime;
+        private Coroutine permissionRequestCoroutine;
 #if LOG_MicVcInput
         private const float WarningThrottleSeconds = 3f;
         private float nextNoDeviceWarningTime;
@@ -83,6 +109,7 @@ namespace MetaVoiceChat.Core
 
         public event Action<string> OnActiveDeviceChanged;
         public event Action<string[], string[]> OnDevicesChanged;
+        public event Action<MicInputState> OnStateChanged;
 
         public VcPipeline Pipeline
         {
@@ -133,6 +160,7 @@ namespace MetaVoiceChat.Core
 
         public string SelectedDevice => selectedDevice;
         public string ActiveDevice => activeDevice;
+        public MicInputState State => state;
         public bool IsRecording => isRecording;
         public AudioClip AudioClip => audioClip;
         public int RequestedFrequency => requestedFrequency;
@@ -149,6 +177,7 @@ namespace MetaVoiceChat.Core
         public bool AutoReconnect => GetAutoReconnect();
         public float ReconnectPollInterval => GetReconnectPollInterval();
         public float ReconnectFailureTimeout => GetReconnectFailureTimeout();
+        public float DeviceRefreshInterval => GetDeviceRefreshInterval();
 
         public void SetSelectedDevice(string device)
         {
@@ -195,6 +224,11 @@ namespace MetaVoiceChat.Core
             if (changed)
             {
                 OnDevicesChanged?.Invoke(oldDevices, newDevices);
+            }
+
+            if (Application.isPlaying)
+            {
+                nextDeviceRefreshTime = Time.realtimeSinceStartup + GetDeviceRefreshInterval();
             }
         }
 
@@ -253,6 +287,7 @@ namespace MetaVoiceChat.Core
         private void OnDisable()
         {
             reconnectRequested = false;
+            StopPermissionRequest();
             StopRecordingInternal(resetActiveDevice: true);
             ReleaseCaptureBuffers();
         }
@@ -260,6 +295,7 @@ namespace MetaVoiceChat.Core
         private void OnDestroy()
         {
             reconnectRequested = false;
+            StopPermissionRequest();
             StopRecordingInternal(resetActiveDevice: true);
             ReleaseCaptureBuffers();
         }
@@ -272,7 +308,7 @@ namespace MetaVoiceChat.Core
             }
 
             ValidateSerializedSettings();
-            RefreshDevices();
+            MaybeRefreshDevices();
 
             int oldRequestedFrequency = requestedFrequency;
             ApplyFrameSettings();
@@ -316,15 +352,23 @@ namespace MetaVoiceChat.Core
                 return false;
             }
 
+            if (!Application.HasUserAuthorization(UserAuthorization.Microphone))
+            {
+                BeginMicrophonePermissionRequest(scheduleReconnectOnFailure);
+                return false;
+            }
+
             reconnectRequested = false;
             StopRecordingInternal(resetActiveDevice: false);
 
             ValidateSerializedSettings();
             RefreshDevices();
             ApplyFrameSettings();
+            SetState(MicInputState.Starting);
 
             if (devices.Length == 0)
             {
+                SetState(MicInputState.NoDevices);
                 LogNoDeviceWarning();
                 if (scheduleReconnectOnFailure && GetAutoReconnect())
                 {
@@ -338,6 +382,7 @@ namespace MetaVoiceChat.Core
             string device = ResolveDevice();
             if (string.IsNullOrEmpty(device))
             {
+                SetState(MicInputState.NoDevices);
                 LogNoDeviceWarning();
                 if (scheduleReconnectOnFailure && GetAutoReconnect())
                 {
@@ -351,6 +396,7 @@ namespace MetaVoiceChat.Core
             AudioClip startedClip = Microphone.Start(device, true, ClipLoopSeconds, requestedFrequency);
             if (startedClip == null)
             {
+                SetState(MicInputState.StartFailed);
                 LogStartFailureWarning(device, "Unity returned a null AudioClip.");
                 if (scheduleReconnectOnFailure && GetAutoReconnect())
                 {
@@ -372,6 +418,7 @@ namespace MetaVoiceChat.Core
                     device,
                     $"Unity returned a microphone clip with {audioClip.channels} channels. {nameof(MicVcInput)} only sends mono frames.");
                 StopRecordingInternal(resetActiveDevice: true);
+                SetState(MicInputState.StartFailed);
                 if (scheduleReconnectOnFailure && GetAutoReconnect())
                 {
                     ScheduleReconnect(GetReconnectFailureTimeout());
@@ -390,6 +437,8 @@ namespace MetaVoiceChat.Core
             }
 
             isRecording = true;
+            SetState(MicInputState.Recording);
+            ResetPositionStallTracking(previousMicrophonePosition);
             ResetReadStateToCurrentMicrophonePosition();
             ResetFrameClock();
             EnsureReadBuffer();
@@ -432,6 +481,11 @@ namespace MetaVoiceChat.Core
             {
                 SetActiveDevice(string.Empty);
             }
+
+            if (resetActiveDevice)
+            {
+                SetState(MicInputState.Stopped);
+            }
         }
 
         private void ReconnectNow()
@@ -456,6 +510,7 @@ namespace MetaVoiceChat.Core
         {
             if (GetAutoReconnect())
             {
+                SetState(MicInputState.DeviceLost);
                 RequestReconnect();
                 return;
             }
@@ -473,16 +528,19 @@ namespace MetaVoiceChat.Core
         {
             if (audioClip == null || string.IsNullOrEmpty(activeDevice))
             {
+                SetState(MicInputState.DeviceLost);
                 return true;
             }
 
             if (!ContainsDevice(activeDevice))
             {
+                SetState(MicInputState.DeviceLost);
                 return true;
             }
 
             if (!Microphone.IsRecording(activeDevice))
             {
+                SetState(MicInputState.DeviceLost);
                 return true;
             }
 
@@ -562,7 +620,7 @@ namespace MetaVoiceChat.Core
         private void DispatchFrames(float[] samples, int sampleCount)
         {
             VcPipeline pipeline = vcPipeline;
-            if (pipeline == null)
+            if (pipeline == null || !pipeline.isActiveAndEnabled)
             {
                 LogNoPipelineWarning();
                 return;
@@ -595,6 +653,12 @@ namespace MetaVoiceChat.Core
             }
 
             position = Math.Min(position, Math.Max(0, clipSamples - 1));
+            if (HasPositionStalled(position))
+            {
+                LogStartFailureWarning(activeDevice, "Unity microphone position stopped advancing.");
+                return -1;
+            }
+
             if (!positionInitialized)
             {
                 previousMicrophonePosition = position;
@@ -609,6 +673,20 @@ namespace MetaVoiceChat.Core
             return completedClipLoops * (long)clipSamples + position;
         }
 
+        private bool HasPositionStalled(int position)
+        {
+            float now = Time.realtimeSinceStartup;
+            if (position != lastObservedPosition)
+            {
+                lastObservedPosition = position;
+                lastPositionAdvanceTime = now;
+                return false;
+            }
+
+            return now - recordingStartTime > PositionStallStartupGraceSeconds &&
+                   now - lastPositionAdvanceTime > PositionStallTimeoutSeconds;
+        }
+
         private void ResetReadStateToCurrentMicrophonePosition()
         {
             positionInitialized = false;
@@ -618,6 +696,14 @@ namespace MetaVoiceChat.Core
 #if LOG_MicVcInput
             runtimeAvailableSamples = 0;
 #endif
+        }
+
+        private void ResetPositionStallTracking(int position)
+        {
+            float now = Time.realtimeSinceStartup;
+            recordingStartTime = now;
+            lastObservedPosition = position;
+            lastPositionAdvanceTime = now;
         }
 
         private void ResetFrameClock()
@@ -663,6 +749,16 @@ namespace MetaVoiceChat.Core
             readBuffer = Array.Empty<float>();
         }
 
+        private void MaybeRefreshDevices()
+        {
+            if (Time.realtimeSinceStartup < nextDeviceRefreshTime)
+            {
+                return;
+            }
+
+            RefreshDevices();
+        }
+
         private string ResolveDevice()
         {
             if (!string.IsNullOrEmpty(selectedDevice) && ContainsDevice(selectedDevice))
@@ -692,11 +788,70 @@ namespace MetaVoiceChat.Core
             OnActiveDeviceChanged?.Invoke(activeDevice);
         }
 
+        private void SetState(MicInputState nextState)
+        {
+            if (state == nextState)
+            {
+                return;
+            }
+
+            state = nextState;
+            onStateChanged?.Invoke(state);
+            OnStateChanged?.Invoke(state);
+        }
+
+        private void BeginMicrophonePermissionRequest(bool scheduleReconnectOnFailure)
+        {
+            if (permissionRequestCoroutine != null)
+            {
+                return;
+            }
+
+            SetState(MicInputState.WaitingForPermission);
+            nextReconnectAttemptTime = float.PositiveInfinity;
+            permissionRequestCoroutine = StartCoroutine(RequestMicrophonePermission(scheduleReconnectOnFailure));
+        }
+
+        private IEnumerator RequestMicrophonePermission(bool scheduleReconnectOnFailure)
+        {
+            yield return Application.RequestUserAuthorization(UserAuthorization.Microphone);
+            permissionRequestCoroutine = null;
+
+            if (!isActiveAndEnabled)
+            {
+                yield break;
+            }
+
+            if (!Application.HasUserAuthorization(UserAuthorization.Microphone))
+            {
+                SetState(MicInputState.PermissionDenied);
+                if (scheduleReconnectOnFailure && GetAutoReconnect())
+                {
+                    ScheduleReconnect(GetReconnectFailureTimeout());
+                }
+
+                yield break;
+            }
+
+            StartRecordingInternal(scheduleReconnectOnFailure);
+        }
+
+        private void StopPermissionRequest()
+        {
+            if (permissionRequestCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(permissionRequestCoroutine);
+            permissionRequestCoroutine = null;
+        }
+
         private void ValidateSerializedSettings()
         {
             vcFrequency = SanitizeFrequency(vcFrequency);
             vcMilliseconds = SanitizeMilliseconds(vcMilliseconds);
-            selectedDevice ??= string.Empty;
+            selectedDevice = string.IsNullOrWhiteSpace(selectedDevice) ? string.Empty : selectedDevice;
         }
 
         private bool GetAutoReconnect()
@@ -723,6 +878,13 @@ namespace MetaVoiceChat.Core
             return micVcConfig != null
                 ? Math.Max(MinimumReconnectFailureTimeout, micVcConfig.reconnectFailureTimeout)
                 : DefaultReconnectFailureTimeout;
+        }
+
+        private float GetDeviceRefreshInterval()
+        {
+            return micVcConfig != null
+                ? Math.Max(MinimumDeviceRefreshInterval, micVcConfig.deviceRefreshInterval)
+                : DefaultDeviceRefreshInterval;
         }
 
         private void LogNoDeviceWarning()
@@ -798,7 +960,7 @@ namespace MetaVoiceChat.Core
 
             nextOverrunWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
             Debug.LogWarning(
-                $"{nameof(MicVcInput)} fell behind the 1 second microphone loop and dropped {droppedSamples} old samples before reading {readableSamples} samples.",
+                $"{nameof(MicVcInput)} fell behind the {ClipLoopSeconds} second microphone loop and dropped {droppedSamples} old samples before reading {readableSamples} samples.",
                 this);
 #endif
         }

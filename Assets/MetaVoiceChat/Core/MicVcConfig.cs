@@ -11,15 +11,21 @@ namespace MetaVoiceChat.Core
         public bool autoReconnect = true;
 
         [Tooltip("Seconds to wait before the first retry after startup when no microphone can be opened.")]
-        [Min(0f)]
+        [Range(0f, 10f)]
         public float reconnectInitialDelay = MicVcInput.DefaultReconnectInitialDelay;
 
-        [Tooltip("Seconds between checks while no microphone devices are available.")]
-        [Min(MicVcInput.MinimumReconnectPollInterval)]
+        [Tooltip("Seconds between retry attempts while no microphone can be opened.")]
+        [Range(MicVcInput.MinimumReconnectPollInterval, 10f)]
         public float reconnectPollInterval = MicVcInput.DefaultReconnectPollInterval;
 
         [Tooltip("Seconds to wait after Unity reports a microphone start failure.")]
-        [Min(MicVcInput.MinimumReconnectFailureTimeout)]
+        [Range(MicVcInput.MinimumReconnectFailureTimeout, 10f)]
         public float reconnectFailureTimeout = MicVcInput.DefaultReconnectFailureTimeout;
+
+        [Header("Device Discovery")]
+
+        [Tooltip("Seconds between Unity microphone device list refreshes.")]
+        [Range(MicVcInput.MinimumDeviceRefreshInterval, 10f)]
+        public float deviceRefreshInterval = MicVcInput.DefaultDeviceRefreshInterval;
     }
 }
