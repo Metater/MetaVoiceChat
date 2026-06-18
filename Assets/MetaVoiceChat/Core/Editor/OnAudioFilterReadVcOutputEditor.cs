@@ -7,12 +7,13 @@ namespace MetaVoiceChat.Core.Editor
     [CanEditMultipleObjects]
     public sealed class OnAudioFilterReadVcOutputEditor : UnityEditor.Editor
     {
-        private SerializedProperty audioFilterReadConfig;
-
-        private void OnEnable()
-        {
-            audioFilterReadConfig = serializedObject.FindProperty("audioFilterReadConfig");
-        }
+        private const int RecommendedMinPacketsInBuffer = 4;
+        private const int RecommendedMaxPacketsInBuffer = 64;
+        private const int RecommendedMinMaxDelayMs = 40;
+        private const int RecommendedMaxDelayMs = 300;
+        private const int RecommendedMaxAdditionalDelayMs = 100;
+        private const int RecommendedMaxResamplerQuality = 4;
+        private const int RecommendedMaxVoiceLatencyMs = 300;
 
         public override void OnInspectorGUI()
         {
@@ -37,6 +38,21 @@ namespace MetaVoiceChat.Core.Editor
 
         private void DrawWarningPanelsFor(OnAudioFilterReadVcOutput output)
         {
+            if (!output.gameObject.activeInHierarchy)
+            {
+                DrawPanel(
+                    "Inactive GameObject",
+                    "This GameObject is inactive in the hierarchy. The output will not receive Unity lifecycle calls or produce voice audio until it is active.",
+                    MessageType.Error);
+            }
+            else if (!output.enabled)
+            {
+                DrawPanel(
+                    "Disabled Voice Output",
+                    "This component is disabled. It will not start the AudioSource, accept frames, or run OnAudioFilterRead until it is enabled.",
+                    MessageType.Error);
+            }
+
             AudioSource source = output.GetComponent<AudioSource>();
             if (source == null)
             {
@@ -47,19 +63,19 @@ namespace MetaVoiceChat.Core.Editor
                 return;
             }
 
-            DrawConfigPanels();
+            DrawConfigPanels(output);
             DrawAudioSourcePanels(source);
             DrawUnityAudioSettingsPanels();
         }
 
-        private void DrawConfigPanels()
+        private void DrawConfigPanels(OnAudioFilterReadVcOutput output)
         {
-            Object configObject = audioFilterReadConfig != null ? audioFilterReadConfig.objectReferenceValue : null;
+            Object configObject = GetConfigObject(output);
             if (configObject == null)
             {
                 DrawPanel(
                     "Default NetEQ Settings",
-                    "No config asset is assigned. The output will use built-in NetEQ and resampler defaults.",
+                    $"No config asset is assigned. The output will use defaults: {OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer} packets, {OnAudioFilterReadVcOutput.DefaultMinDelayMs}-{OnAudioFilterReadVcOutput.DefaultMaxDelayMs} ms NetEQ delay, {OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs} ms additional delay, quality {OnAudioFilterReadVcOutput.DefaultResamplerQuality}, and {OnAudioFilterReadVcOutput.DefaultResamplerBufferMs} ms resampler chunks.",
                     MessageType.Info);
                 return;
             }
@@ -70,52 +86,169 @@ namespace MetaVoiceChat.Core.Editor
             SerializedProperty minDelayMs = config.FindProperty("minDelayMs");
             SerializedProperty additionalDelayMs = config.FindProperty("additionalDelayMs");
             SerializedProperty resamplerQuality = config.FindProperty("resamplerQuality");
+            SerializedProperty resamplerBufferMs = config.FindProperty("resamplerBufferMs");
 
-            if (maxPacketsInBuffer != null && maxPacketsInBuffer.intValue < 1)
+            int maxPackets = GetWholeNumberValue(maxPacketsInBuffer);
+            int maxDelay = GetWholeNumberValue(maxDelayMs);
+            int minDelay = GetWholeNumberValue(minDelayMs);
+            int additionalDelay = GetWholeNumberValue(additionalDelayMs);
+            int quality = GetWholeNumberValue(resamplerQuality);
+            int resamplerBuffer = GetWholeNumberValue(resamplerBufferMs);
+
+            if (maxPacketsInBuffer != null && maxPackets < 1)
             {
                 DrawPanel(
                     "Invalid Packet Buffer",
                     "Max Packets In Buffer must be at least 1. The runtime clamps this, but the asset value should be corrected.",
                     MessageType.Error);
             }
+            else if (maxPacketsInBuffer != null && maxPackets < RecommendedMinPacketsInBuffer)
+            {
+                DrawPanel(
+                    "Tiny Packet Buffer",
+                    $"Max Packets In Buffer is below {RecommendedMinPacketsInBuffer}. This leaves very little room for jitter bursts and can make playback underrun.",
+                    MessageType.Warning);
+            }
+            else if (maxPacketsInBuffer != null && maxPackets > RecommendedMaxPacketsInBuffer)
+            {
+                DrawPanel(
+                    "Large Packet Buffer",
+                    $"Max Packets In Buffer is above {RecommendedMaxPacketsInBuffer}. This can hide queueing problems and allow more voice audio to build up before playback catches up.",
+                    MessageType.Warning);
+            }
 
             if (minDelayMs != null &&
                 maxDelayMs != null &&
-                GetWholeNumberValue(minDelayMs) > GetWholeNumberValue(maxDelayMs))
+                minDelay > maxDelay)
             {
                 DrawPanel(
                     "Invalid NetEQ Delay",
-                    "Min Delay is greater than Max Delay. NetEQ delay targets should be ordered from minimum to maximum.",
+                    "Min Delay is greater than Max Delay. The runtime clamps Max Delay upward, but the asset should be fixed so the intended jitter-buffer range is obvious.",
                     MessageType.Error);
             }
 
-            if (maxDelayMs != null && GetWholeNumberValue(maxDelayMs) > 300)
+            if (maxDelayMs != null && maxDelay < RecommendedMinMaxDelayMs)
+            {
+                DrawPanel(
+                    "Aggressive NetEQ Delay",
+                    $"Max Delay is below {RecommendedMinMaxDelayMs} ms. This is very responsive, but even modest network jitter can cause underruns or artifacts.",
+                    MessageType.Warning);
+            }
+
+            if (maxDelayMs != null && maxDelay > RecommendedMaxDelayMs)
             {
                 DrawPanel(
                     "High NetEQ Delay",
-                    "Max Delay is above 300 ms. This can make voice playback feel noticeably late.",
+                    $"Max Delay is above {RecommendedMaxDelayMs} ms. This can make voice playback feel noticeably late.",
                     MessageType.Warning);
             }
 
-            if (additionalDelayMs != null && GetWholeNumberValue(additionalDelayMs) > 100)
+            if (additionalDelayMs != null && additionalDelay > RecommendedMaxAdditionalDelayMs)
             {
                 DrawPanel(
                     "Additional Delay",
-                    "Additional Delay is above 100 ms. This intentionally adds latency on top of the jitter buffer.",
+                    $"Additional Delay is above {RecommendedMaxAdditionalDelayMs} ms. This intentionally adds latency on top of the adaptive jitter buffer.",
                     MessageType.Warning);
             }
 
-            if (resamplerQuality != null && resamplerQuality.intValue > 4)
+            int estimatedVoiceBufferMs = Mathf.Max(minDelay, maxDelay) + additionalDelay + Mathf.Clamp(resamplerBuffer, 10, 100);
+            if (maxDelayMs != null &&
+                additionalDelayMs != null &&
+                resamplerBufferMs != null &&
+                estimatedVoiceBufferMs > RecommendedMaxVoiceLatencyMs)
+            {
+                DrawPanel(
+                    "High Voice Buffering",
+                    $"This config can buffer about {estimatedVoiceBufferMs} ms before Unity DSP latency. Voice may feel delayed even if packets arrive cleanly.",
+                    MessageType.Warning);
+            }
+
+            if (resamplerQuality != null && quality > RecommendedMaxResamplerQuality)
             {
                 DrawPanel(
                     "Expensive Resampling",
-                    "Resampler Quality above 4 can be costly for real-time voice playback.",
+                    $"Resampler Quality above {RecommendedMaxResamplerQuality} can be costly for real-time voice playback.",
                     MessageType.Warning);
+            }
+
+            if (resamplerBufferMs != null)
+            {
+                int roundedResamplerBuffer = Mathf.Clamp((resamplerBuffer + 5) / 10 * 10, 10, 100);
+                if (resamplerBuffer != roundedResamplerBuffer)
+                {
+                    DrawPanel(
+                        "Rounded Resampler Buffer",
+                        $"Resampler Buffer is {resamplerBuffer} ms. Runtime rounds it to {roundedResamplerBuffer} ms, so edit the asset if that was not intentional.",
+                        MessageType.Info);
+                }
+
+                int callbackMs = GetDspCallbackMs();
+                if (callbackMs > 0 && roundedResamplerBuffer > callbackMs)
+                {
+                    DrawPanel(
+                        "Large Resampler Chunk",
+                        $"Resampler Buffer is {roundedResamplerBuffer} ms, larger than the current {callbackMs} ms Unity DSP callback. This can add avoidable local buffering.",
+                        MessageType.Warning);
+                }
             }
         }
 
         private void DrawAudioSourcePanels(AudioSource source)
         {
+            if (!source.enabled)
+            {
+                DrawPanel(
+                    "Disabled AudioSource",
+                    "The AudioSource is disabled. Unity will not invoke OnAudioFilterRead for this output until the AudioSource is enabled.",
+                    MessageType.Error);
+            }
+
+            if (source.mute)
+            {
+                DrawPanel(
+                    "Muted AudioSource",
+                    "The AudioSource is muted, so voice output will be silent even while frames are accepted and processed.",
+                    MessageType.Error);
+            }
+
+            if (source.volume <= 0f)
+            {
+                DrawPanel(
+                    "Zero AudioSource Volume",
+                    "AudioSource Volume is 0, so voice output will be silent.",
+                    MessageType.Error);
+            }
+            else if (source.volume < 0.25f)
+            {
+                DrawPanel(
+                    "Low AudioSource Volume",
+                    "AudioSource Volume is very low. Voice may appear broken even though packets and OnAudioFilterRead are working.",
+                    MessageType.Warning);
+            }
+
+            if (source.pitch <= 0f)
+            {
+                DrawPanel(
+                    "Invalid AudioSource Pitch",
+                    "AudioSource Pitch is 0 or negative. Keep Pitch at 1 for normal voice playback.",
+                    MessageType.Error);
+            }
+            else if (!Mathf.Approximately(source.pitch, 1f))
+            {
+                DrawPanel(
+                    "Changed AudioSource Pitch",
+                    "AudioSource Pitch is not 1. This can change playback timing and make voice sound wrong.",
+                    MessageType.Warning);
+            }
+
+            if (source.clip != null)
+            {
+                DrawPanel(
+                    "Playback Clip Overridden",
+                    "This component creates and assigns its own generated playback clip at runtime. Any clip currently assigned here is only an editor-time placeholder.",
+                    MessageType.Info);
+            }
+
             if (source.spatialBlend <= 0f)
             {
                 DrawPanel(
@@ -141,6 +274,7 @@ namespace MetaVoiceChat.Core.Editor
             AudioSettings.GetDSPBufferSize(out int bufferLength, out int numBuffers);
             int outputSampleRate = AudioSettings.outputSampleRate;
             int dspMs = outputSampleRate > 0 ? bufferLength * numBuffers * 1000 / outputSampleRate : 0;
+            int callbackMs = outputSampleRate > 0 ? bufferLength * 1000 / outputSampleRate : 0;
 
             if (dspMs > 100)
             {
@@ -148,6 +282,14 @@ namespace MetaVoiceChat.Core.Editor
                     "High DSP Buffer Latency",
                     $"The current Unity DSP buffer is about {dspMs} ms ({bufferLength} x {numBuffers} at {outputSampleRate} Hz). This latency is added after NetEQ output. Consider changing the DSP Buffer Size to \"Best latency\" in the project audio settings.",
                     MessageType.Warning);
+            }
+
+            if (callbackMs >= 40)
+            {
+                DrawPanel(
+                    "Large DSP Callback",
+                    $"Each Unity audio callback is about {callbackMs} ms. Smaller DSP callbacks usually make voice output feel more responsive.",
+                    MessageType.Info);
             }
 
             AudioSpeakerMode speakerMode = AudioSettings.speakerMode;
@@ -167,9 +309,23 @@ namespace MetaVoiceChat.Core.Editor
             }
         }
 
-        private static long GetWholeNumberValue(SerializedProperty property)
+        private static Object GetConfigObject(OnAudioFilterReadVcOutput output)
         {
-            return property.propertyType == SerializedPropertyType.Integer ? property.intValue : 0L;
+            using SerializedObject serializedOutput = new SerializedObject(output);
+            SerializedProperty config = serializedOutput.FindProperty("audioFilterReadConfig");
+            return config != null ? config.objectReferenceValue : null;
+        }
+
+        private static int GetWholeNumberValue(SerializedProperty property)
+        {
+            return property != null && property.propertyType == SerializedPropertyType.Integer ? property.intValue : 0;
+        }
+
+        private static int GetDspCallbackMs()
+        {
+            AudioSettings.GetDSPBufferSize(out int bufferLength, out _);
+            int outputSampleRate = AudioSettings.outputSampleRate;
+            return outputSampleRate > 0 ? bufferLength * 1000 / outputSampleRate : 0;
         }
 
         private static int GetSpeakerModeChannelCount(AudioSpeakerMode speakerMode)
