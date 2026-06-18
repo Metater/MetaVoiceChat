@@ -443,6 +443,7 @@ GameObject:
   - component: {fileID: 1511361414}
   - component: {fileID: 1511361415}
   - component: {fileID: 1511361416}
+  - component: {fileID: 1511361418}
   - component: {fileID: 1511361417}
   m_Layer: 0
   m_Name: Audio Source
@@ -585,34 +586,30 @@ MonoBehaviour:
   m_GameObject: {fileID: 1511361413}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d56e2f2b3fcc44a9a783be8cecea1e92, type: 3}
+  m_Script: {fileID: 11500000, guid: 1b9ac7e3bce80504abc948b81fb97195, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.TestOnAudioFilterReadVcOutput
-  feedOnEnable: 1
-  feedInUpdate: 1
-  feedInFixedUpdate: 0
-  sendSilence: 0
-  sendNullSilenceFrames: 1
-  maxFramesPerUpdate: 32
-  prerollFramesOnFirstUpdate: 6
-  inputSampleRate: 48000
-  inputChannels: 1
-  frameDurationMs: 10
-  initialSequenceNumber: 0
-  initialTimestamp: 0
-  frequencyHz: 440
-  amplitude: 0.2
-  dcOffset: 0
-  rightChannelPhaseOffsetDegrees: 0
-  rightChannelFrequencyMultiplier: 1
-  resetPhaseOnEnable: 1
-  twoChannelDifferentSines: 0
-  rightChannelFrequencyHz: 660
-  rightChannelAmplitude: 0.2
-  rightChannelDcOffset: 0
-  exposeRuntimeLatency: 0
-  currentNetEqBufferMs: 0
-  receiveToEarLatencyMs: 0
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.VcPipeline
+  output: {fileID: 1511361415}
+--- !u!114 &1511361418
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1511361413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 980b95cf19cef2446a18dc5a44e54b44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.MicVcInput
+  vcPipeline: {fileID: 1511361417}
+  micVcConfig: {fileID: 11400000, guid: 951f1909053e12243ab920db0bfa2143, type: 2}
+  vcFrequency: 0
+  vcMilliseconds: 0
+  selectedDevice: 
+  onActiveDeviceChanged:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

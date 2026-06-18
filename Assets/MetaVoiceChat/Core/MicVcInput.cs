@@ -1,9 +1,973 @@
+//#define LOG_MicVcInput
+
+using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace MetaVoiceChat.Core
 {
-    public class MicVcInput : MonoBehaviour
+    [DisallowMultipleComponent]
+    public sealed class MicVcInput : MonoBehaviour
     {
+        public const int InputChannels = 1;
+        public const int ClipLoopSeconds = 1;
 
+        public const float DefaultReconnectInitialDelay = 0.25f;
+        public const float DefaultReconnectPollInterval = 1f;
+        public const float DefaultReconnectFailureTimeout = 2f;
+        public const float MinimumReconnectPollInterval = 0.05f;
+        public const float MinimumReconnectFailureTimeout = 0.1f;
+
+        private const VcFrequency DefaultFrequency = VcFrequency.Hz48000;
+        private const VcMilliseconds DefaultMilliseconds = VcMilliseconds.Ms20;
+        private const int MaxPooledArraysPerLength = 4;
+
+        [Header("Voice Pipeline")]
+        [Tooltip("Pipeline that receives mono microphone frames. The frame array is reused every call, so processors should copy data immediately if they need to keep it.")]
+        [SerializeField] private VcPipeline vcPipeline;
+
+        [Tooltip("Optional microphone input settings. Leave empty to use default reconnect behavior.")]
+        [SerializeField] private MicVcConfig micVcConfig;
+
+        [Header("Frame")]
+        [Tooltip("Requested Unity microphone sample rate. Changing this at runtime restarts the microphone automatically.")]
+        [SerializeField] private VcFrequency vcFrequency = DefaultFrequency;
+
+        [Tooltip("Duration of each voice frame. Changing this at runtime changes the frame size without requiring an output rebuild.")]
+        [SerializeField] private VcMilliseconds vcMilliseconds = DefaultMilliseconds;
+
+        [Header("Device")]
+        [Tooltip("Optional microphone device name. Leave empty to use the first available device. If auto reconnect is enabled and this device appears later, the input reconnects to it automatically.")]
+        [SerializeField] private string selectedDevice = string.Empty;
+
+        [Tooltip("Invoked when the active microphone device changes. The value is empty when no microphone is active.")]
+        [SerializeField] private UnityEvent<string> onActiveDeviceChanged = new UnityEvent<string>();
+
+#if LOG_MicVcInput
+        [Header("Runtime Diagnostics")]
+        [Tooltip("Shows live capture values in the inspector while playing.")]
+        [SerializeField] private bool exposeRuntimeDiagnostics = true;
+
+        [SerializeField, HideInInspector] private string runtimeActiveDevice = string.Empty;
+        [SerializeField, HideInInspector] private int runtimeRequestedFrequency;
+        [SerializeField, HideInInspector] private int runtimeActualFrequency;
+        [SerializeField, HideInInspector] private int runtimeFrameSize;
+        [SerializeField, HideInInspector] private int runtimeReadBufferSize;
+        [SerializeField, HideInInspector] private int runtimeAvailableSamples;
+        [SerializeField, HideInInspector] private int runtimeFramesSent;
+        [SerializeField, HideInInspector] private int runtimeDroppedSamples;
+#endif
+
+        private readonly FloatArrayPool arrayPool = new FloatArrayPool(MaxPooledArraysPerLength);
+
+        private AudioClip audioClip;
+        private string activeDevice = string.Empty;
+        private string[] devices = Array.Empty<string>();
+        private bool hasDeviceSnapshot;
+        private bool isRecording;
+        private bool reconnectRequested;
+        private bool positionInitialized;
+        private int requestedFrequency;
+        private int actualFrequency;
+        private int frameMilliseconds;
+        private int frameSize;
+        private int clipSamples;
+        private int previousMicrophonePosition;
+        private long completedClipLoops;
+        private long readAbsolutePosition;
+        private float nextReconnectAttemptTime;
+#if LOG_MicVcInput
+        private const float WarningThrottleSeconds = 3f;
+        private float nextNoDeviceWarningTime;
+        private float nextStartFailureWarningTime;
+        private float nextPipelineWarningTime;
+        private float nextReadFailureWarningTime;
+        private float nextOverrunWarningTime;
+#endif
+        private float[] readBuffer = Array.Empty<float>();
+        private float[] frameBuffer = Array.Empty<float>();
+        private ushort sequenceNumber;
+        private uint timestamp;
+
+        public event Action<string> OnActiveDeviceChanged;
+        public event Action<string[], string[]> OnDevicesChanged;
+
+        public VcPipeline Pipeline
+        {
+            get { return vcPipeline; }
+            set { vcPipeline = value; }
+        }
+
+        public MicVcConfig Config
+        {
+            get { return micVcConfig; }
+            set { micVcConfig = value; }
+        }
+
+        public VcFrequency VcFrequency
+        {
+            get { return vcFrequency; }
+            set
+            {
+                VcFrequency sanitized = SanitizeFrequency(value);
+                if (vcFrequency == sanitized)
+                {
+                    return;
+                }
+
+                vcFrequency = sanitized;
+                if (isActiveAndEnabled)
+                {
+                    RequestReconnect();
+                }
+            }
+        }
+
+        public VcMilliseconds VcMilliseconds
+        {
+            get { return vcMilliseconds; }
+            set
+            {
+                VcMilliseconds sanitized = SanitizeMilliseconds(value);
+                if (vcMilliseconds == sanitized)
+                {
+                    return;
+                }
+
+                vcMilliseconds = sanitized;
+                ApplyFrameSettings();
+            }
+        }
+
+        public string SelectedDevice => selectedDevice;
+        public string ActiveDevice => activeDevice;
+        public bool IsRecording => isRecording;
+        public AudioClip AudioClip => audioClip;
+        public int RequestedFrequency => requestedFrequency;
+        public int ActualFrequency => actualFrequency;
+        public int FrameMilliseconds => frameMilliseconds;
+        public int FrameSize => frameSize;
+        public int ReadBufferSize => readBuffer.Length;
+#if LOG_MicVcInput
+        public int AvailableSamples => runtimeAvailableSamples;
+        public int FramesSent => runtimeFramesSent;
+        public int DroppedSamples => runtimeDroppedSamples;
+        public bool ExposeRuntimeDiagnostics => exposeRuntimeDiagnostics;
+#endif
+        public bool AutoReconnect => GetAutoReconnect();
+        public float ReconnectPollInterval => GetReconnectPollInterval();
+        public float ReconnectFailureTimeout => GetReconnectFailureTimeout();
+
+        public void SetSelectedDevice(string device)
+        {
+            string normalized = string.IsNullOrWhiteSpace(device) ? string.Empty : device;
+            if (selectedDevice == normalized)
+            {
+                return;
+            }
+
+            selectedDevice = normalized;
+            if (isActiveAndEnabled)
+            {
+                RequestReconnect();
+            }
+        }
+
+        public bool ContainsDevice(string device)
+        {
+            if (string.IsNullOrEmpty(device))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < devices.Length; i++)
+            {
+                if (devices[i] == device)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void RefreshDevices()
+        {
+            string[] oldDevices = devices;
+            string[] newDevices = Microphone.devices ?? Array.Empty<string>();
+
+            bool changed = !hasDeviceSnapshot || !AreDeviceListsEqual(oldDevices, newDevices);
+            devices = newDevices;
+            hasDeviceSnapshot = true;
+
+            if (changed)
+            {
+                OnDevicesChanged?.Invoke(oldDevices, newDevices);
+            }
+        }
+
+        public bool StartRecording()
+        {
+            return StartRecordingInternal(scheduleReconnectOnFailure: true);
+        }
+
+        public void StopRecording()
+        {
+            StopRecordingInternal(resetActiveDevice: true);
+        }
+
+        private void Awake()
+        {
+            ValidateSerializedSettings();
+            ApplyFrameSettings();
+        }
+
+        private void Reset()
+        {
+            if (vcPipeline == null)
+            {
+                TryGetComponent(out vcPipeline);
+            }
+
+            ValidateSerializedSettings();
+            ApplyFrameSettings();
+            CacheRuntimeDiagnostics();
+        }
+
+        private void OnEnable()
+        {
+            ValidateSerializedSettings();
+            RefreshDevices();
+            ApplyFrameSettings();
+            if (!Application.isPlaying)
+            {
+                CacheRuntimeDiagnostics();
+                return;
+            }
+
+            float reconnectInitialDelay = GetReconnectInitialDelay();
+            nextReconnectAttemptTime = Time.realtimeSinceStartup + reconnectInitialDelay;
+            reconnectRequested = false;
+
+            if (!StartRecordingInternal(scheduleReconnectOnFailure: true))
+            {
+                if (GetAutoReconnect())
+                {
+                    nextReconnectAttemptTime = Math.Max(
+                        nextReconnectAttemptTime,
+                        Time.realtimeSinceStartup + reconnectInitialDelay);
+                }
+            }
+        }
+
+        private void OnDisable()
+        {
+            reconnectRequested = false;
+            StopRecordingInternal(resetActiveDevice: true);
+            ReleaseCaptureBuffers();
+        }
+
+        private void OnDestroy()
+        {
+            reconnectRequested = false;
+            StopRecordingInternal(resetActiveDevice: true);
+            ReleaseCaptureBuffers();
+            arrayPool.Clear();
+        }
+
+        private void Update()
+        {
+            if (!Application.isPlaying)
+            {
+                CacheRuntimeDiagnostics();
+                return;
+            }
+
+            ValidateSerializedSettings();
+            RefreshDevices();
+
+            int oldRequestedFrequency = requestedFrequency;
+            ApplyFrameSettings();
+
+            if (isRecording && oldRequestedFrequency != requestedFrequency)
+            {
+                RequestReconnect();
+            }
+
+            bool autoReconnect = GetAutoReconnect();
+            if (isRecording)
+            {
+                if (reconnectRequested || (autoReconnect && ShouldReconnect()))
+                {
+                    ReconnectNow();
+                    CacheRuntimeDiagnostics();
+                    return;
+                }
+
+                ReadAllAvailableMicrophoneData();
+            }
+
+            if (autoReconnect && !isRecording && Time.realtimeSinceStartup >= nextReconnectAttemptTime)
+            {
+                StartRecordingInternal(scheduleReconnectOnFailure: true);
+            }
+
+            CacheRuntimeDiagnostics();
+        }
+
+        private void OnValidate()
+        {
+            ValidateSerializedSettings();
+            if (!Application.isPlaying)
+            {
+                ApplyFrameSettings();
+                CacheRuntimeDiagnostics();
+            }
+        }
+
+        private bool StartRecordingInternal(bool scheduleReconnectOnFailure)
+        {
+            if (!Application.isPlaying)
+            {
+                return false;
+            }
+
+            reconnectRequested = false;
+            StopRecordingInternal(resetActiveDevice: false);
+
+            ValidateSerializedSettings();
+            RefreshDevices();
+            ApplyFrameSettings();
+
+            if (devices.Length == 0)
+            {
+                LogNoDeviceWarning();
+                if (scheduleReconnectOnFailure && GetAutoReconnect())
+                {
+                    ScheduleReconnect(GetReconnectPollInterval());
+                }
+
+                SetActiveDevice(string.Empty);
+                return false;
+            }
+
+            string device = ResolveDevice();
+            if (string.IsNullOrEmpty(device))
+            {
+                LogNoDeviceWarning();
+                if (scheduleReconnectOnFailure && GetAutoReconnect())
+                {
+                    ScheduleReconnect(GetReconnectPollInterval());
+                }
+
+                SetActiveDevice(string.Empty);
+                return false;
+            }
+
+            AudioClip startedClip = Microphone.Start(device, true, ClipLoopSeconds, requestedFrequency);
+            if (startedClip == null)
+            {
+                LogStartFailureWarning(device, "Unity returned a null AudioClip.");
+                if (scheduleReconnectOnFailure && GetAutoReconnect())
+                {
+                    ScheduleReconnect(GetReconnectFailureTimeout());
+                }
+
+                SetActiveDevice(string.Empty);
+                return false;
+            }
+
+            audioClip = startedClip;
+            clipSamples = Math.Max(1, audioClip.samples);
+            actualFrequency = audioClip.frequency > 0 ? audioClip.frequency : requestedFrequency;
+            SetActiveDevice(device);
+
+            if (audioClip.channels != InputChannels)
+            {
+                LogStartFailureWarning(
+                    device,
+                    $"Unity returned a microphone clip with {audioClip.channels} channels. {nameof(MicVcInput)} only sends mono frames.");
+                StopRecordingInternal(resetActiveDevice: true);
+                if (scheduleReconnectOnFailure && GetAutoReconnect())
+                {
+                    ScheduleReconnect(GetReconnectFailureTimeout());
+                }
+
+                return false;
+            }
+
+            if (actualFrequency != requestedFrequency)
+            {
+#if LOG_MicVcInput
+                Debug.LogWarning(
+                    $"{nameof(MicVcInput)} requested {requestedFrequency} Hz from \"{device}\", but Unity created a {actualFrequency} Hz microphone clip. Frames will be stamped with the actual clip frequency.",
+                    this);
+#endif
+            }
+
+            isRecording = true;
+            ResetReadStateToCurrentMicrophonePosition();
+            ResetFrameClock();
+            EnsureFrameBuffer();
+            nextReconnectAttemptTime = float.PositiveInfinity;
+            return true;
+        }
+
+        private void StopRecordingInternal(bool resetActiveDevice)
+        {
+            string deviceToStop = activeDevice;
+
+            isRecording = false;
+            positionInitialized = false;
+            clipSamples = 0;
+            previousMicrophonePosition = 0;
+            completedClipLoops = 0;
+            readAbsolutePosition = 0;
+            actualFrequency = requestedFrequency;
+
+            if (!string.IsNullOrEmpty(deviceToStop) && Microphone.IsRecording(deviceToStop))
+            {
+                Microphone.End(deviceToStop);
+            }
+
+            if (audioClip != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(audioClip);
+                }
+                else
+                {
+                    DestroyImmediate(audioClip);
+                }
+
+                audioClip = null;
+            }
+
+            if (resetActiveDevice)
+            {
+                SetActiveDevice(string.Empty);
+            }
+        }
+
+        private void ReconnectNow()
+        {
+            StopRecordingInternal(resetActiveDevice: true);
+            reconnectRequested = false;
+            StartRecordingInternal(scheduleReconnectOnFailure: true);
+        }
+
+        private void RequestReconnect()
+        {
+            if (!Application.isPlaying || !isActiveAndEnabled)
+            {
+                return;
+            }
+
+            reconnectRequested = true;
+            nextReconnectAttemptTime = Time.realtimeSinceStartup;
+        }
+
+        private void HandleAutomaticReconnectNeeded()
+        {
+            if (GetAutoReconnect())
+            {
+                RequestReconnect();
+                return;
+            }
+
+            StopRecordingInternal(resetActiveDevice: true);
+        }
+
+        private void ScheduleReconnect(float delaySeconds)
+        {
+            float delay = Math.Max(0f, delaySeconds);
+            nextReconnectAttemptTime = Time.realtimeSinceStartup + delay;
+        }
+
+        private bool ShouldReconnect()
+        {
+            if (audioClip == null || string.IsNullOrEmpty(activeDevice))
+            {
+                return true;
+            }
+
+            if (!ContainsDevice(activeDevice))
+            {
+                return true;
+            }
+
+            if (!Microphone.IsRecording(activeDevice))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrEmpty(selectedDevice) &&
+                selectedDevice != activeDevice &&
+                ContainsDevice(selectedDevice))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private void ReadAllAvailableMicrophoneData()
+        {
+            if (audioClip == null || string.IsNullOrEmpty(activeDevice) || frameSize <= 0)
+            {
+                return;
+            }
+
+            long currentAbsolutePosition = GetCurrentAbsoluteMicrophonePosition();
+            if (currentAbsolutePosition < 0)
+            {
+                HandleAutomaticReconnectNeeded();
+                return;
+            }
+
+            if (currentAbsolutePosition < readAbsolutePosition)
+            {
+                readAbsolutePosition = currentAbsolutePosition;
+            }
+
+            long availableSamples = currentAbsolutePosition - readAbsolutePosition;
+#if LOG_MicVcInput
+            runtimeAvailableSamples = availableSamples > int.MaxValue ? int.MaxValue : (int)Math.Max(0, availableSamples);
+#endif
+            if (availableSamples < frameSize)
+            {
+                return;
+            }
+
+            int readableSamples = (int)Math.Min(int.MaxValue, availableSamples / frameSize * frameSize);
+            int maxReadableSamples = Math.Max(frameSize, clipSamples / frameSize * frameSize);
+            if (readableSamples > maxReadableSamples)
+            {
+                int dropped = readableSamples - maxReadableSamples;
+#if LOG_MicVcInput
+                runtimeDroppedSamples += dropped;
+#endif
+                LogOverrunWarning(dropped, readableSamples);
+                readableSamples = maxReadableSamples;
+                readAbsolutePosition = currentAbsolutePosition - readableSamples;
+            }
+
+            if (readableSamples <= 0)
+            {
+                return;
+            }
+
+            float[] samples = EnsureReadBuffer(readableSamples);
+            int offsetSamples = PositiveModulo(readAbsolutePosition, clipSamples);
+            if (!audioClip.GetData(samples, offsetSamples))
+            {
+                LogReadFailureWarning();
+                HandleAutomaticReconnectNeeded();
+                return;
+            }
+
+            DispatchFrames(samples, readableSamples);
+            readAbsolutePosition += readableSamples;
+        }
+
+        private void DispatchFrames(float[] samples, int sampleCount)
+        {
+            VcPipeline pipeline = vcPipeline;
+            if (pipeline == null)
+            {
+                LogNoPipelineWarning();
+                return;
+            }
+
+            EnsureFrameBuffer();
+            for (int offset = 0; offset + frameSize <= sampleCount; offset += frameSize)
+            {
+                Array.Copy(samples, offset, frameBuffer, 0, frameSize);
+                pipeline.Process(frameBuffer, frameSize, actualFrequency, InputChannels, sequenceNumber, timestamp);
+                sequenceNumber = unchecked((ushort)(sequenceNumber + 1));
+                timestamp = unchecked(timestamp + (uint)frameSize);
+#if LOG_MicVcInput
+                runtimeFramesSent++;
+#endif
+            }
+        }
+
+        private long GetCurrentAbsoluteMicrophonePosition()
+        {
+            if (!Microphone.IsRecording(activeDevice))
+            {
+                return -1;
+            }
+
+            int position = Microphone.GetPosition(activeDevice);
+            if (position < 0)
+            {
+                return -1;
+            }
+
+            position = Math.Min(position, Math.Max(0, clipSamples - 1));
+            if (!positionInitialized)
+            {
+                previousMicrophonePosition = position;
+                positionInitialized = true;
+            }
+            else if (position < previousMicrophonePosition)
+            {
+                completedClipLoops++;
+            }
+
+            previousMicrophonePosition = position;
+            return completedClipLoops * (long)clipSamples + position;
+        }
+
+        private void ResetReadStateToCurrentMicrophonePosition()
+        {
+            positionInitialized = false;
+            completedClipLoops = 0;
+            previousMicrophonePosition = 0;
+            readAbsolutePosition = Math.Max(0, GetCurrentAbsoluteMicrophonePosition());
+#if LOG_MicVcInput
+            runtimeAvailableSamples = 0;
+#endif
+        }
+
+        private void ResetFrameClock()
+        {
+            sequenceNumber = 0;
+            timestamp = 0;
+#if LOG_MicVcInput
+            runtimeFramesSent = 0;
+            runtimeDroppedSamples = 0;
+#endif
+        }
+
+        private void ApplyFrameSettings()
+        {
+            requestedFrequency = SafeFrequencyToInt(vcFrequency);
+            frameMilliseconds = SafeMillisecondsToInt(vcMilliseconds);
+            actualFrequency = isRecording && audioClip != null && audioClip.frequency > 0
+                ? audioClip.frequency
+                : requestedFrequency;
+
+            int nextFrameSize = Math.Max(1, actualFrequency * frameMilliseconds / 1000);
+            if (frameSize != nextFrameSize)
+            {
+                frameSize = nextFrameSize;
+                ReturnBuffer(ref frameBuffer);
+            }
+
+            EnsureFrameBuffer();
+        }
+
+        private void EnsureFrameBuffer()
+        {
+            if (frameSize <= 0 || frameBuffer.Length == frameSize)
+            {
+                return;
+            }
+
+            ReturnBuffer(ref frameBuffer);
+            frameBuffer = arrayPool.Rent(frameSize);
+        }
+
+        private float[] EnsureReadBuffer(int requiredLength)
+        {
+            if (readBuffer.Length == requiredLength)
+            {
+                return readBuffer;
+            }
+
+            ReturnBuffer(ref readBuffer);
+            readBuffer = arrayPool.Rent(requiredLength);
+            return readBuffer;
+        }
+
+        private void ReleaseCaptureBuffers()
+        {
+            ReturnBuffer(ref readBuffer);
+            ReturnBuffer(ref frameBuffer);
+#if LOG_MicVcInput
+            runtimeReadBufferSize = 0;
+#endif
+        }
+
+        private void ReturnBuffer(ref float[] buffer)
+        {
+            arrayPool.Return(ref buffer);
+        }
+
+        private string ResolveDevice()
+        {
+            if (!string.IsNullOrEmpty(selectedDevice) && ContainsDevice(selectedDevice))
+            {
+                return selectedDevice;
+            }
+
+            return devices.Length > 0 ? devices[0] : string.Empty;
+        }
+
+        private void SetActiveDevice(string device)
+        {
+            string normalized = string.IsNullOrEmpty(device) ? string.Empty : device;
+            if (activeDevice == normalized)
+            {
+#if LOG_MicVcInput
+                runtimeActiveDevice = activeDevice;
+#endif
+                return;
+            }
+
+            activeDevice = normalized;
+#if LOG_MicVcInput
+            runtimeActiveDevice = activeDevice;
+#endif
+            onActiveDeviceChanged?.Invoke(activeDevice);
+            OnActiveDeviceChanged?.Invoke(activeDevice);
+        }
+
+        private void ValidateSerializedSettings()
+        {
+            vcFrequency = SanitizeFrequency(vcFrequency);
+            vcMilliseconds = SanitizeMilliseconds(vcMilliseconds);
+            selectedDevice ??= string.Empty;
+        }
+
+        private bool GetAutoReconnect()
+        {
+            return micVcConfig == null || micVcConfig.autoReconnect;
+        }
+
+        private float GetReconnectInitialDelay()
+        {
+            return micVcConfig != null
+                ? Math.Max(0f, micVcConfig.reconnectInitialDelay)
+                : DefaultReconnectInitialDelay;
+        }
+
+        private float GetReconnectPollInterval()
+        {
+            return micVcConfig != null
+                ? Math.Max(MinimumReconnectPollInterval, micVcConfig.reconnectPollInterval)
+                : DefaultReconnectPollInterval;
+        }
+
+        private float GetReconnectFailureTimeout()
+        {
+            return micVcConfig != null
+                ? Math.Max(MinimumReconnectFailureTimeout, micVcConfig.reconnectFailureTimeout)
+                : DefaultReconnectFailureTimeout;
+        }
+
+#if LOG_MicVcInput
+        private void CacheRuntimeDiagnostics()
+        {
+            if (!exposeRuntimeDiagnostics && Application.isPlaying)
+            {
+                return;
+            }
+
+            runtimeActiveDevice = activeDevice;
+            runtimeRequestedFrequency = requestedFrequency;
+            runtimeActualFrequency = actualFrequency;
+            runtimeFrameSize = frameSize;
+            runtimeReadBufferSize = readBuffer.Length;
+        }
+#else
+        private void CacheRuntimeDiagnostics()
+        {
+        }
+#endif
+
+        private void LogNoDeviceWarning()
+        {
+#if LOG_MicVcInput
+            if (Time.realtimeSinceStartup < nextNoDeviceWarningTime)
+            {
+                return;
+            }
+
+            nextNoDeviceWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
+            Debug.LogWarning(
+                $"{nameof(MicVcInput)} could not find any microphone devices. " +
+                (GetAutoReconnect() ? "It will keep reconnecting automatically." : "Auto reconnect is disabled."),
+                this);
+#endif
+        }
+
+        private void LogStartFailureWarning(string device, string reason)
+        {
+#if LOG_MicVcInput
+            if (Time.realtimeSinceStartup < nextStartFailureWarningTime)
+            {
+                return;
+            }
+
+            nextStartFailureWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
+            Debug.LogWarning(
+                $"{nameof(MicVcInput)} failed to start microphone \"{device}\". {reason} " +
+                (GetAutoReconnect() ? "It will retry automatically." : "Auto reconnect is disabled."),
+                this);
+#endif
+        }
+
+        private void LogNoPipelineWarning()
+        {
+#if LOG_MicVcInput
+            if (Time.realtimeSinceStartup < nextPipelineWarningTime)
+            {
+                return;
+            }
+
+            nextPipelineWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
+            Debug.LogWarning(
+                $"{nameof(MicVcInput)} captured microphone frames but no {nameof(VcPipeline)} is assigned, so frames are being discarded.",
+                this);
+#endif
+        }
+
+        private void LogReadFailureWarning()
+        {
+#if LOG_MicVcInput
+            if (Time.realtimeSinceStartup < nextReadFailureWarningTime)
+            {
+                return;
+            }
+
+            nextReadFailureWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
+            Debug.LogWarning(
+                $"{nameof(MicVcInput)} failed to read microphone clip data. " +
+                (GetAutoReconnect() ? "It will reconnect automatically." : "Auto reconnect is disabled."),
+                this);
+#endif
+        }
+
+        private void LogOverrunWarning(int droppedSamples, int readableSamples)
+        {
+#if LOG_MicVcInput
+            if (Time.realtimeSinceStartup < nextOverrunWarningTime)
+            {
+                return;
+            }
+
+            nextOverrunWarningTime = Time.realtimeSinceStartup + WarningThrottleSeconds;
+            Debug.LogWarning(
+                $"{nameof(MicVcInput)} fell behind the 1 second microphone loop and dropped {droppedSamples} old samples before reading {readableSamples} samples.",
+                this);
+#endif
+        }
+
+        private static bool AreDeviceListsEqual(string[] left, string[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static VcFrequency SanitizeFrequency(VcFrequency frequency)
+        {
+            return frequency.IsValid() ? frequency : DefaultFrequency;
+        }
+
+        private static VcMilliseconds SanitizeMilliseconds(VcMilliseconds milliseconds)
+        {
+            return milliseconds.IsValid() ? milliseconds : DefaultMilliseconds;
+        }
+
+        private static int SafeFrequencyToInt(VcFrequency frequency)
+        {
+            return SanitizeFrequency(frequency).ToInt();
+        }
+
+        private static int SafeMillisecondsToInt(VcMilliseconds milliseconds)
+        {
+            return SanitizeMilliseconds(milliseconds).ToInt();
+        }
+
+        private static int PositiveModulo(long value, int divisor)
+        {
+            if (divisor <= 0)
+            {
+                return 0;
+            }
+
+            long result = value % divisor;
+            if (result < 0)
+            {
+                result += divisor;
+            }
+
+            return (int)result;
+        }
+
+        private sealed class FloatArrayPool
+        {
+            private readonly Dictionary<int, Stack<float[]>> arraysByLength = new Dictionary<int, Stack<float[]>>();
+            private readonly int maxArraysPerLength;
+
+            public FloatArrayPool(int maxArraysPerLength)
+            {
+                this.maxArraysPerLength = Math.Max(1, maxArraysPerLength);
+            }
+
+            public float[] Rent(int length)
+            {
+                if (length <= 0)
+                {
+                    return Array.Empty<float>();
+                }
+
+                if (arraysByLength.TryGetValue(length, out Stack<float[]> arrays) && arrays.Count > 0)
+                {
+                    return arrays.Pop();
+                }
+
+                return new float[length];
+            }
+
+            public void Return(ref float[] buffer)
+            {
+                float[] returned = buffer;
+                buffer = Array.Empty<float>();
+
+                if (returned == null || returned.Length == 0)
+                {
+                    return;
+                }
+
+                if (!arraysByLength.TryGetValue(returned.Length, out Stack<float[]> arrays))
+                {
+                    arrays = new Stack<float[]>();
+                    arraysByLength.Add(returned.Length, arrays);
+                }
+
+                if (arrays.Count < maxArraysPerLength)
+                {
+                    arrays.Push(returned);
+                }
+            }
+
+            public void Clear()
+            {
+                arraysByLength.Clear();
+            }
+        }
     }
 }
