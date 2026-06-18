@@ -178,7 +178,6 @@ namespace MetaVoiceChat.Core
 
         private void OnValidate()
         {
-            inputSampleRate = ClosestSupportedSampleRate(inputSampleRate);
             inputChannels = Mathf.Clamp(inputChannels, 1, 2);
             if (twoChannelDifferentSines)
             {
@@ -210,7 +209,7 @@ namespace MetaVoiceChat.Core
 
         private void CacheValidatedSettings(out int sampleRate, out int channels, out int frameSamplesPerChannel)
         {
-            sampleRate = ClosestSupportedSampleRate(inputSampleRate);
+            sampleRate = inputSampleRate;
             channels = twoChannelDifferentSines ? 2 : Math.Clamp(inputChannels, 1, 2);
             frameSamplesPerChannel = Math.Max(1, sampleRate * Math.Max(1, frameDurationMs) / 1000);
         }

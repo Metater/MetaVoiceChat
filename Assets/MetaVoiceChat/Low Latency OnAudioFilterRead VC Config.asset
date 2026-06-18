@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Low Latency OnAudioFilterRead VC Config
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcConfig
   resamplerQuality: 4
-  resamplerBufferMs: 5
+  resamplerBufferMs: 10
   maxPacketsInBuffer: 8
   maxDelayMs: 80
   minDelayMs: 10

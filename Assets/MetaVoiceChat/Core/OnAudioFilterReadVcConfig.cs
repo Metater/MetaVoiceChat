@@ -11,8 +11,8 @@ namespace MetaVoiceChat.Core
         [Range(0, 10)]
         public int resamplerQuality = OnAudioFilterReadVcOutput.DefaultResamplerQuality;
 
-        [Tooltip("NetEQ read/resampler batch size in milliseconds. Smaller values reduce extra local output buffering; larger values reduce read/resampler call overhead. Values larger than Unity's audio callback size can add latency. Rounded to the nearest 5 ms internally.")]
-        [Range(5, 100)]
+        [Tooltip("Local output/resampler buffer target in milliseconds. NetEQ GetAudio is always pulled in 10 ms chunks; this value is rounded to the nearest 10 ms internally for buffering estimates.")]
+        [Range(10, 100)]
         [SerializeField]
         private int resamplerBufferMs = OnAudioFilterReadVcOutput.DefaultResamplerBufferMs;
 
@@ -38,8 +38,8 @@ namespace MetaVoiceChat.Core
         {
             get
             {
-                int value = (resamplerBufferMs + 2) / 5 * 5;
-                return System.Math.Clamp(value, 5, 100);
+                int value = (resamplerBufferMs + 5) / 10 * 10;
+                return System.Math.Clamp(value, 10, 100);
             }
         }
     }

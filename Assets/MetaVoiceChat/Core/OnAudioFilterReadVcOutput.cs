@@ -482,7 +482,7 @@ namespace MetaVoiceChat.Core
 
         private bool EnsureNetEqFor(int sampleRate, int channels)
         {
-            if (!IsSupportedNetEqSampleRate(sampleRate) || channels <= 0 || channels > 2)
+            if (sampleRate <= 0 || channels <= 0 || channels > 2)
             {
                 return false;
             }
@@ -519,10 +519,9 @@ namespace MetaVoiceChat.Core
             }
 
             int safety = 0;
-            int readMs = Math.Clamp(Volatile.Read(ref cachedResamplerBufferMs), 10, 100);
             while (outputFifo.Count < requiredSamples && safety++ < MaxNetEqReadsPerCallback)
             {
-                int samplesPerChannel = Math.Max(1, netEqSampleRate * readMs / 1000);
+                int samplesPerChannel = TenMsSamplesPerChannel(netEqSampleRate);
                 int readLength = samplesPerChannel * netEqChannels;
                 float[] readBuffer = EnsureAudioBuffer(ref netEqReadBuffer, readLength, clearNewBuffer: false);
                 int readSamples = netEq.GetAudio(readBuffer, readLength);
@@ -957,14 +956,6 @@ namespace MetaVoiceChat.Core
             }
         }
 
-        private static bool IsSupportedNetEqSampleRate(int sampleRate)
-        {
-            return sampleRate == 8000 ||
-                sampleRate == 16000 ||
-                sampleRate == 32000 ||
-                sampleRate == 48000;
-        }
-
         private static int HashNetEqConfig(
             int maxPacketsInBuffer,
             int maxDelayMs,
@@ -985,7 +976,7 @@ namespace MetaVoiceChat.Core
         private static bool IsValidFrameShape(int frameSize, int inputSampleRate, int inputChannels)
         {
             if (frameSize <= 0 ||
-                !IsSupportedNetEqSampleRate(inputSampleRate) ||
+                inputSampleRate <= 0 ||
                 (inputChannels != 1 && inputChannels != 2) ||
                 frameSize % inputChannels != 0)
             {
@@ -1000,6 +991,11 @@ namespace MetaVoiceChat.Core
                 samplesPerChannel * 1000 == durationMs * inputSampleRate &&
                 durationMs > 0 &&
                 durationMs <= MaxPacketDurationMs;
+        }
+
+        private static int TenMsSamplesPerChannel(int sampleRate)
+        {
+            return Math.Max(1, (int)Math.Round(sampleRate * 0.01));
         }
 
         private static float[] EnsureAudioBuffer(ref float[] buffer, int requiredLength, bool clearNewBuffer)

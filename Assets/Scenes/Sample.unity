@@ -594,20 +594,20 @@ MonoBehaviour:
   sendSilence: 0
   sendNullSilenceFrames: 1
   maxFramesPerUpdate: 32
-  prerollFramesOnFirstUpdate: 0
-  inputSampleRate: 8000
+  prerollFramesOnFirstUpdate: 6
+  inputSampleRate: 48000
   inputChannels: 1
   frameDurationMs: 10
   initialSequenceNumber: 0
   initialTimestamp: 0
   frequencyHz: 440
-  amplitude: 0.3
+  amplitude: 0.2
   dcOffset: 0
   rightChannelPhaseOffsetDegrees: 0
   rightChannelFrequencyMultiplier: 1
   resetPhaseOnEnable: 1
   twoChannelDifferentSines: 0
-  rightChannelFrequencyHz: 440
+  rightChannelFrequencyHz: 660
   rightChannelAmplitude: 0.2
   rightChannelDcOffset: 0
   exposeRuntimeLatency: 0

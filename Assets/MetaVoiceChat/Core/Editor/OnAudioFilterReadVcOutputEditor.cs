@@ -75,7 +75,7 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Default NetEQ Settings",
-                    $"No config asset is assigned. The output will use defaults: {OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer} packets, {OnAudioFilterReadVcOutput.DefaultMinDelayMs}-{OnAudioFilterReadVcOutput.DefaultMaxDelayMs} ms NetEQ delay, {OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs} ms additional delay, quality {OnAudioFilterReadVcOutput.DefaultResamplerQuality}, and {OnAudioFilterReadVcOutput.DefaultResamplerBufferMs} ms resampler chunks.",
+                    $"No config asset is assigned. The output will use defaults: {OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer} packets, {OnAudioFilterReadVcOutput.DefaultMinDelayMs}-{OnAudioFilterReadVcOutput.DefaultMaxDelayMs} ms NetEQ delay, {OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs} ms additional delay, quality {OnAudioFilterReadVcOutput.DefaultResamplerQuality}, and a {OnAudioFilterReadVcOutput.DefaultResamplerBufferMs} ms local output buffer target. NetEQ GetAudio is pulled in 10 ms chunks.",
                     MessageType.Info);
                 return;
             }
@@ -151,7 +151,8 @@ namespace MetaVoiceChat.Core.Editor
                     MessageType.Warning);
             }
 
-            int estimatedVoiceBufferMs = Mathf.Max(minDelay, maxDelay) + additionalDelay + Mathf.Clamp(resamplerBuffer, 10, 100);
+            int roundedResamplerBuffer = RoundResamplerBufferMs(resamplerBuffer);
+            int estimatedVoiceBufferMs = Mathf.Max(minDelay, maxDelay) + additionalDelay + roundedResamplerBuffer;
             if (maxDelayMs != null &&
                 additionalDelayMs != null &&
                 resamplerBufferMs != null &&
@@ -173,7 +174,6 @@ namespace MetaVoiceChat.Core.Editor
 
             if (resamplerBufferMs != null)
             {
-                int roundedResamplerBuffer = Mathf.Clamp((resamplerBuffer + 2) / 5 * 5, 5, 100);
                 if (resamplerBuffer != roundedResamplerBuffer)
                 {
                     DrawPanel(
@@ -183,7 +183,7 @@ namespace MetaVoiceChat.Core.Editor
                 }
 
                 int callbackMs = GetDspCallbackMs();
-                if (callbackMs > 0 && roundedResamplerBuffer > callbackMs)
+                if (callbackMs > 0 && roundedResamplerBuffer > callbackMs && roundedResamplerBuffer > 10)
                 {
                     DrawPanel(
                         "Large Resampler Chunk",
@@ -326,6 +326,11 @@ namespace MetaVoiceChat.Core.Editor
             AudioSettings.GetDSPBufferSize(out int bufferLength, out _);
             int outputSampleRate = AudioSettings.outputSampleRate;
             return outputSampleRate > 0 ? bufferLength * 1000 / outputSampleRate : 0;
+        }
+
+        private static int RoundResamplerBufferMs(int value)
+        {
+            return Mathf.Clamp((value + 5) / 10 * 10, 10, 100);
         }
 
         private static int GetSpeakerModeChannelCount(AudioSpeakerMode speakerMode)
