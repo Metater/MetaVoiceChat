@@ -8,12 +8,10 @@ namespace MetaVoiceChat.Core.Editor
     public sealed class OnAudioFilterReadVcOutputEditor : UnityEditor.Editor
     {
         private SerializedProperty audioFilterReadConfig;
-        private SerializedProperty pendingFrameCapacity;
 
         private void OnEnable()
         {
             audioFilterReadConfig = serializedObject.FindProperty("audioFilterReadConfig");
-            pendingFrameCapacity = serializedObject.FindProperty("pendingFrameCapacity");
         }
 
         public override void OnInspectorGUI()
@@ -47,14 +45,6 @@ namespace MetaVoiceChat.Core.Editor
                     "This component needs an AudioSource on the same GameObject before Unity can invoke OnAudioFilterRead.",
                     MessageType.Error);
                 return;
-            }
-
-            if (GetPendingFrameCapacity() < OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer)
-            {
-                DrawPanel(
-                    "Small Pending Queue",
-                    $"Pending Frame Capacity is below the default NetEQ packet buffer ({OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer}). Bursty receive timing may drop packets before the audio thread can drain them.",
-                    MessageType.Warning);
             }
 
             DrawConfigPanels();
@@ -99,11 +89,11 @@ namespace MetaVoiceChat.Core.Editor
                     MessageType.Error);
             }
 
-            if (maxDelayMs != null && GetWholeNumberValue(maxDelayMs) > 500)
+            if (maxDelayMs != null && GetWholeNumberValue(maxDelayMs) > 300)
             {
                 DrawPanel(
                     "High NetEQ Delay",
-                    "Max Delay is above 500 ms. This can make voice playback feel noticeably late.",
+                    "Max Delay is above 300 ms. This can make voice playback feel noticeably late.",
                     MessageType.Warning);
             }
 
@@ -175,11 +165,6 @@ namespace MetaVoiceChat.Core.Editor
                     $"Unity is currently using {speakerMode}. NetEQ accepts mono/stereo packets; this output will convert voice audio to the active speaker layout.",
                     MessageType.Info);
             }
-        }
-
-        private int GetPendingFrameCapacity()
-        {
-            return pendingFrameCapacity != null ? pendingFrameCapacity.intValue : OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer;
         }
 
         private static long GetWholeNumberValue(SerializedProperty property)

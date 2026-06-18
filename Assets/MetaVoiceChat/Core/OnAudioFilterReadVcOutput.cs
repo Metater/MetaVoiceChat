@@ -1,9 +1,8 @@
 //#define LOG_OnAudioFilterReadVcOutput
 
 using System;
-using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
@@ -13,21 +12,18 @@ namespace MetaVoiceChat.Core
     public sealed class OnAudioFilterReadVcOutput : MonoBehaviour
     {
         public const int DefaultMaxPacketsInBuffer = 16;
-        public const int DefaultMaxDelayMs = 200;
+        public const int DefaultMaxDelayMs = 150;
         public const int DefaultMinDelayMs = 20;
         public const int DefaultAdditionalDelayMs = 0;
         public const int DefaultResamplerQuality = 4;
         public const int DefaultResamplerBufferMs = 10;
-        private const int MinimumPendingFrameCapacity = 8;
-        private const int MaximumPendingFrameCapacity = 256;
-        private const int DefaultPendingFrameCapacity = 32;
+        private const int PendingFramePoolCapacity = 32;
         private const int MaxPacketDurationMs = 60;
         private const int MaxPendingFrameAgeMs = 250;
         private const int MaxPacketsDrainedPerCallback = 16;
-        private const int MaxNetEqReadsPerCallback = 32;
+        private const int MaxNetEqReadsPerCallback = 16;
 
         [SerializeField] private OnAudioFilterReadVcConfig audioFilterReadConfig;
-        [Range(MinimumPendingFrameCapacity, MaximumPendingFrameCapacity)][SerializeField] private int pendingFrameCapacity = DefaultPendingFrameCapacity;
         private const bool createPlaybackClip = true;
 
 #if LOG_OnAudioFilterReadVcOutput
@@ -40,10 +36,10 @@ namespace MetaVoiceChat.Core
         private AudioClip playbackClip;
         private float[] playbackClipSamples = Array.Empty<float>();
 
-        private FrameSlot[] pendingFrames = Array.Empty<FrameSlot>();
-        private int pendingFrameMask;
-        private readonly PaddedLong writeCursor = new PaddedLong();
-        private readonly PaddedLong readCursor = new PaddedLong();
+        private readonly ConcurrentQueue<PendingFrame> pendingFrames = new ConcurrentQueue<PendingFrame>();
+        private readonly ConcurrentQueue<PendingFrame> availableFrames = new ConcurrentQueue<PendingFrame>();
+        private readonly object framePoolInitializationLock = new object();
+        private int framePoolInitialized;
 
         private int acceptingFrames;
         private int outputActive;
@@ -146,8 +142,7 @@ namespace MetaVoiceChat.Core
             }
 
             bool isSilence = frame == null;
-            int copiedSamples = isSilence ? 0 : Math.Min(frameSize, frame.Length);
-            if (!isSilence && copiedSamples < frameSize)
+            if (!isSilence && frame.Length < frameSize)
             {
 #if LOG_OnAudioFilterReadVcOutput
                 Interlocked.Increment(ref droppedInvalidFrameCount);
@@ -155,7 +150,8 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
-            if (!TryReservePendingSlot(out long reservedCursor, out FrameSlot slot))
+            InitializePendingFramePool();
+            if (!availableFrames.TryDequeue(out PendingFrame pendingFrame))
             {
 #if LOG_OnAudioFilterReadVcOutput
                 Interlocked.Increment(ref droppedFullFrameCount);
@@ -163,44 +159,46 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
-            Volatile.Write(ref slot.State, FrameSlot.Writing);
-
             bool published = false;
             try
             {
                 if (!isSilence)
                 {
-                    slot.EnsureCapacity(frameSize);
-                    Array.Copy(frame, 0, slot.Samples, 0, frameSize);
+                    pendingFrame.EnsureCapacity(frameSize);
+                    Array.Copy(frame, 0, pendingFrame.Samples, 0, frameSize);
                 }
 
-                slot.SampleLength = frameSize;
-                slot.InputSampleRate = inputSampleRate;
-                slot.InputChannels = inputChannels;
-                slot.SequenceNumber = sequenceNumber;
-                slot.Timestamp = timestamp;
-                slot.ReceivedTimestamp = Stopwatch.GetTimestamp();
-                slot.IsSilence = isSilence;
-                slot.Cursor = reservedCursor;
+                pendingFrame.SampleLength = frameSize;
+                pendingFrame.InputSampleRate = inputSampleRate;
+                pendingFrame.InputChannels = inputChannels;
+                pendingFrame.SequenceNumber = sequenceNumber;
+                pendingFrame.Timestamp = timestamp;
+                pendingFrame.ReceivedTimestamp = Stopwatch.GetTimestamp();
+                pendingFrame.IsSilence = isSilence;
 
+                if (Volatile.Read(ref acceptingFrames) == 0)
+                {
+                    return;
+                }
+
+                pendingFrames.Enqueue(pendingFrame);
                 published = true;
-                Volatile.Write(ref slot.State, FrameSlot.Ready);
 #if LOG_OnAudioFilterReadVcOutput
                 Interlocked.Increment(ref acceptedFrameCount);
 #endif
             }
-            catch
-            {
-                Volatile.Write(ref slot.State, FrameSlot.Aborted);
-                throw;
-            }
             finally
             {
-                if (!published && Volatile.Read(ref slot.State) == FrameSlot.Writing)
+                if (!published)
                 {
-                    Volatile.Write(ref slot.State, FrameSlot.Aborted);
+                    availableFrames.Enqueue(pendingFrame);
                 }
             }
+        }
+
+        private void Awake()
+        {
+            InitializePendingFramePool();
         }
 
         private void OnEnable()
@@ -208,25 +206,30 @@ namespace MetaVoiceChat.Core
             AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
 
             CacheMainThreadSettings();
-            EnsurePendingFrames();
+            InitializePendingFramePool();
+            ClearPendingFrames();
             TryPreloadNetEqNativeLibrary();
 
-            if (TryGetComponent(out audioSource))
+            if (!TryGetComponent(out audioSource))
             {
-                ConfigureAudioSource(audioSource);
-
-                if (createPlaybackClip)
-                {
-                    CreatePlaybackClip();
-                }
-
-                audioSource.Play();
+                Volatile.Write(ref acceptingFrames, 0);
+                Volatile.Write(ref outputActive, 0);
+                return;
             }
 
-            Volatile.Write(ref outputActive, 1);
+            ConfigureAudioSource(audioSource);
+
             Volatile.Write(ref resetAudioThreadStateRequested, 1);
             Volatile.Write(ref resetOutputConversionRequested, 1);
+            Volatile.Write(ref outputActive, 1);
             Volatile.Write(ref acceptingFrames, 1);
+
+            if (createPlaybackClip)
+            {
+                CreatePlaybackClip();
+            }
+
+            audioSource.Play();
         }
 
         private void OnDisable()
@@ -281,8 +284,6 @@ namespace MetaVoiceChat.Core
 
         private void OnValidate()
         {
-            pendingFrameCapacity = Math.Max(MinimumPendingFrameCapacity, pendingFrameCapacity);
-
             if (TryGetComponent(out AudioSource source))
             {
                 ConfigureAudioSource(source);
@@ -348,7 +349,7 @@ namespace MetaVoiceChat.Core
 
                 if (Volatile.Read(ref outputActive) == 0)
                 {
-                    DropPendingFramesAudioThread();
+                    ClearPendingFrames();
                     DisposeAudioThreadState();
                     Volatile.Write(ref resetAudioThreadStateRequested, 0);
                     Array.Clear(data, 0, data.Length);
@@ -416,61 +417,63 @@ namespace MetaVoiceChat.Core
 
         private void DrainPendingFramesAudioThread()
         {
-            int drainedThisCallback = 0;
-            while (drainedThisCallback < MaxPacketsDrainedPerCallback && TryPeekPendingFrame(out FrameSlot slot))
+            int processedThisCallback = 0;
+            long now = Stopwatch.GetTimestamp();
+            while (processedThisCallback < MaxPacketsDrainedPerCallback &&
+                pendingFrames.TryDequeue(out PendingFrame frame))
             {
-                int slotState = Volatile.Read(ref slot.State);
-                if (slotState == FrameSlot.Aborted)
-                {
-                    ReleasePendingFrameAudioThread(slot);
-                    continue;
-                }
+                processedThisCallback++;
 
-                if (TimestampAgeMs(slot.ReceivedTimestamp, Stopwatch.GetTimestamp()) > MaxPendingFrameAgeMs)
+                try
                 {
-                    ReleasePendingFrameAudioThread(slot);
+                    if (TimestampAgeMs(frame.ReceivedTimestamp, now) > MaxPendingFrameAgeMs)
+                    {
 #if LOG_OnAudioFilterReadVcOutput
-                    Interlocked.Increment(ref droppedStaleFrameCount);
+                        Interlocked.Increment(ref droppedStaleFrameCount);
 #endif
-                    continue;
-                }
+                        continue;
+                    }
 
-                if (!EnsureNetEqFor(slot.InputSampleRate, slot.InputChannels))
-                {
-                    ReleasePendingFrameAudioThread(slot);
-                    continue;
-                }
+                    if (!EnsureNetEqFor(frame.InputSampleRate, frame.InputChannels))
+                    {
+                        continue;
+                    }
 
-                float[] packetSamples = slot.IsSilence
-                    ? EnsureAudioBuffer(ref silencePacketBuffer, slot.SampleLength, clearNewBuffer: false)
-                    : slot.Samples;
+                    float[] packetSamples;
+                    if (frame.IsSilence)
+                    {
+                        packetSamples = EnsureAudioBuffer(ref silencePacketBuffer, frame.SampleLength, clearNewBuffer: false);
+                        Array.Clear(packetSamples, 0, frame.SampleLength);
+                    }
+                    else
+                    {
+                        packetSamples = frame.Samples;
+                    }
 
-                if (slot.IsSilence)
-                {
-                    Array.Clear(packetSamples, 0, slot.SampleLength);
-                }
+                    int samplesPerChannel = frame.SampleLength / frame.InputChannels;
+                    int durationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / frame.InputSampleRate));
 
-                int samplesPerChannel = slot.SampleLength / slot.InputChannels;
-                int durationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / slot.InputSampleRate));
+                    netEq.InsertPacket(
+                        frame.SequenceNumber,
+                        frame.Timestamp,
+                        packetSamples,
+                        frame.SampleLength,
+                        frame.InputSampleRate,
+                        frame.InputChannels,
+                        durationMs);
 
-                netEq.InsertPacket(
-                    slot.SequenceNumber,
-                    slot.Timestamp,
-                    packetSamples,
-                    slot.SampleLength,
-                    slot.InputSampleRate,
-                    slot.InputChannels,
-                    durationMs);
+                    Volatile.Write(
+                        ref receiveToInsertLatencyMs,
+                        TimestampAgeMs(frame.ReceivedTimestamp, Stopwatch.GetTimestamp()));
 
-                Volatile.Write(
-                    ref receiveToInsertLatencyMs,
-                    TimestampAgeMs(slot.ReceivedTimestamp, Stopwatch.GetTimestamp()));
-
-                ReleasePendingFrameAudioThread(slot);
 #if LOG_OnAudioFilterReadVcOutput
-                Interlocked.Increment(ref drainedFrameCount);
+                    Interlocked.Increment(ref drainedFrameCount);
 #endif
-                drainedThisCallback++;
+                }
+                finally
+                {
+                    availableFrames.Enqueue(frame);
+                }
             }
 
             if (netEq != null)
@@ -518,9 +521,10 @@ namespace MetaVoiceChat.Core
             }
 
             int safety = 0;
+            int readMs = Math.Clamp(Volatile.Read(ref cachedResamplerBufferMs), 10, 100);
             while (outputFifo.Count < requiredSamples && safety++ < MaxNetEqReadsPerCallback)
             {
-                int samplesPerChannel = Math.Max(1, netEqSampleRate / 100);
+                int samplesPerChannel = Math.Max(1, netEqSampleRate * readMs / 1000);
                 int readLength = samplesPerChannel * netEqChannels;
                 float[] readBuffer = EnsureAudioBuffer(ref netEqReadBuffer, readLength, clearNewBuffer: false);
                 int readSamples = netEq.GetAudio(readBuffer, readLength);
@@ -726,9 +730,6 @@ namespace MetaVoiceChat.Core
 
             nextDiagnosticsLogTime = Time.unscaledTime + Math.Max(0.1f, diagnosticsLogIntervalSeconds);
 
-            long read = Volatile.Read(ref readCursor.Value);
-            long write = Volatile.Read(ref writeCursor.Value);
-            long pending = Math.Max(0L, write - read);
             string exception = lastAudioThreadException;
             if (string.IsNullOrEmpty(exception))
             {
@@ -743,7 +744,7 @@ namespace MetaVoiceChat.Core
                 $"dspRate={Volatile.Read(ref cachedOutputSampleRate)} callbacks={Volatile.Read(ref audioCallbackCount)} " +
                 $"audioLen={Volatile.Read(ref lastAudioDataLength)} audioCh={Volatile.Read(ref lastAudioChannels)} " +
                 $"received={Volatile.Read(ref receivedFrameCount)} accepted={Volatile.Read(ref acceptedFrameCount)} " +
-                $"pending={pending} read={read} write={write} drained={Volatile.Read(ref drainedFrameCount)} " +
+                $"pending={pendingFrames.Count} available={availableFrames.Count} drained={Volatile.Read(ref drainedFrameCount)} " +
                 $"dropInvalid={Volatile.Read(ref droppedInvalidFrameCount)} dropFull={Volatile.Read(ref droppedFullFrameCount)} " +
                 $"dropStale={Volatile.Read(ref droppedStaleFrameCount)} " +
                 $"netEq={(netEq != null ? "yes" : "no")} netEqCreates={Volatile.Read(ref netEqCreateCount)} " +
@@ -756,111 +757,45 @@ namespace MetaVoiceChat.Core
         }
 #endif
 
-        private bool TryReservePendingSlot(out long reservedCursor, out FrameSlot slot)
+        private void InitializePendingFramePool()
         {
-            FrameSlot[] slots = pendingFrames;
-            int capacity = slots.Length;
-
-            while (capacity > 0)
+            if (Volatile.Read(ref framePoolInitialized) != 0)
             {
-                long write = Volatile.Read(ref writeCursor.Value);
-                long read = Volatile.Read(ref readCursor.Value);
+                return;
+            }
 
-                if (write - read >= capacity)
+            lock (framePoolInitializationLock)
+            {
+                if (Volatile.Read(ref framePoolInitialized) != 0)
                 {
-                    reservedCursor = -1L;
-                    slot = null;
-                    return false;
+                    return;
                 }
 
-                if (Interlocked.CompareExchange(ref writeCursor.Value, write + 1L, write) == write)
+                for (int i = 0; i < PendingFramePoolCapacity; i++)
                 {
-                    reservedCursor = write;
-                    slot = slots[(int)(write & pendingFrameMask)];
-                    return true;
+                    availableFrames.Enqueue(new PendingFrame());
                 }
-            }
 
-            reservedCursor = -1L;
-            slot = null;
-            return false;
+                Volatile.Write(ref framePoolInitialized, 1);
+            }
         }
 
-        private bool TryPeekPendingFrame(out FrameSlot slot)
+        private void ClearPendingFrames()
         {
-            FrameSlot[] slots = pendingFrames;
-            if (slots.Length == 0)
+            while (pendingFrames.TryDequeue(out PendingFrame frame))
             {
-                slot = null;
-                return false;
-            }
-
-            long read = Volatile.Read(ref readCursor.Value);
-            if (read >= Volatile.Read(ref writeCursor.Value))
-            {
-                slot = null;
-                return false;
-            }
-
-            FrameSlot candidate = slots[(int)(read & pendingFrameMask)];
-            int state = Volatile.Read(ref candidate.State);
-            if ((state != FrameSlot.Ready && state != FrameSlot.Aborted) ||
-                candidate.Cursor != read)
-            {
-                slot = null;
-                return false;
-            }
-
-            slot = candidate;
-            return true;
-        }
-
-        private void ReleasePendingFrameAudioThread(FrameSlot slot)
-        {
-            Volatile.Write(ref slot.State, FrameSlot.Empty);
-            Volatile.Write(ref readCursor.Value, slot.Cursor + 1L);
-        }
-
-        private void DropPendingFramesAudioThread()
-        {
-            while (TryPeekPendingFrame(out FrameSlot slot))
-            {
-                ReleasePendingFrameAudioThread(slot);
+                availableFrames.Enqueue(frame);
             }
         }
 
         private int GetOldestPendingFrameAgeMs()
         {
-            if (!TryPeekPendingFrame(out FrameSlot slot))
+            if (!pendingFrames.TryPeek(out PendingFrame frame))
             {
                 return 0;
             }
 
-            return TimestampAgeMs(slot.ReceivedTimestamp, Stopwatch.GetTimestamp());
-        }
-
-        private void EnsurePendingFrames()
-        {
-            int capacity = NextPowerOfTwo(Math.Max(MinimumPendingFrameCapacity, pendingFrameCapacity));
-            pendingFrames = new FrameSlot[capacity];
-            for (int i = 0; i < pendingFrames.Length; i++)
-            {
-                pendingFrames[i] = new FrameSlot();
-            }
-
-            pendingFrameMask = capacity - 1;
-            ResetPendingFrameCursors();
-        }
-
-        private void ResetPendingFrameCursors()
-        {
-            Volatile.Write(ref writeCursor.Value, 0L);
-            Volatile.Write(ref readCursor.Value, 0L);
-
-            for (int i = 0; i < pendingFrames.Length; i++)
-            {
-                Volatile.Write(ref pendingFrames[i].State, FrameSlot.Empty);
-            }
+            return TimestampAgeMs(frame.ReceivedTimestamp, Stopwatch.GetTimestamp());
         }
 
         private void CacheMainThreadSettings()
@@ -891,19 +826,24 @@ namespace MetaVoiceChat.Core
             }
 
             OnAudioFilterReadVcConfig config = audioFilterReadConfig;
-            Volatile.Write(ref cachedMaxPacketsInBuffer, Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer));
-            Volatile.Write(ref cachedMaxDelayMs, Math.Max(0, config != null ? (int)config.maxDelayMs : DefaultMaxDelayMs));
-            Volatile.Write(ref cachedMinDelayMs, Math.Max(0, config != null ? (int)config.minDelayMs : DefaultMinDelayMs));
-            Volatile.Write(ref cachedAdditionalDelayMs, Math.Max(0, config != null ? (int)config.additionalDelayMs : DefaultAdditionalDelayMs));
+            int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
+            int minDelayMs = Math.Max(0, config != null ? (int)config.minDelayMs : DefaultMinDelayMs);
+            int maxDelayMs = Math.Max(minDelayMs, config != null ? (int)config.maxDelayMs : DefaultMaxDelayMs);
+            int additionalDelayMs = Math.Max(0, config != null ? (int)config.additionalDelayMs : DefaultAdditionalDelayMs);
+
+            Volatile.Write(ref cachedMaxPacketsInBuffer, maxPacketsInBuffer);
+            Volatile.Write(ref cachedMaxDelayMs, maxDelayMs);
+            Volatile.Write(ref cachedMinDelayMs, minDelayMs);
+            Volatile.Write(ref cachedAdditionalDelayMs, additionalDelayMs);
             Volatile.Write(ref cachedResamplerQuality, Mathf.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
-            Volatile.Write(ref cachedResamplerBufferMs, config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs);
+            Volatile.Write(ref cachedResamplerBufferMs, Math.Clamp(config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs, 10, 100));
             Volatile.Write(
                 ref cachedNetEqConfigHash,
                 HashNetEqConfig(
-                    Volatile.Read(ref cachedMaxPacketsInBuffer),
-                    Volatile.Read(ref cachedMaxDelayMs),
-                    Volatile.Read(ref cachedMinDelayMs),
-                    Volatile.Read(ref cachedAdditionalDelayMs)));
+                    maxPacketsInBuffer,
+                    maxDelayMs,
+                    minDelayMs,
+                    additionalDelayMs));
         }
 
         private void CreatePlaybackClip(bool forceRecreate = false)
@@ -1103,16 +1043,9 @@ namespace MetaVoiceChat.Core
             return value + 1;
         }
 
-        private sealed class FrameSlot
+        private sealed class PendingFrame
         {
-            public const int Empty = 0;
-            public const int Writing = 1;
-            public const int Ready = 2;
-            public const int Aborted = 3;
-
             public float[] Samples = Array.Empty<float>();
-            public int State;
-            public long Cursor;
             public int SampleLength;
             public int InputSampleRate;
             public int InputChannels;
@@ -1121,47 +1054,13 @@ namespace MetaVoiceChat.Core
             public long ReceivedTimestamp;
             public bool IsSilence;
 
-            public void EnsureCapacity(int sampleCount)
+            public void EnsureCapacity(int requiredSamples)
             {
-                if (Samples.Length >= sampleCount)
+                if (Samples.Length < requiredSamples)
                 {
-                    return;
+                    Samples = new float[requiredSamples];
                 }
-
-                if (Samples.Length > 0)
-                {
-                    ArrayPool<float>.Shared.Return(Samples);
-                }
-
-                Samples = ArrayPool<float>.Shared.Rent(sampleCount);
             }
-
-            public void Release()
-            {
-                if (Samples.Length > 0)
-                {
-                    ArrayPool<float>.Shared.Return(Samples);
-                    Samples = Array.Empty<float>();
-                }
-
-                State = Empty;
-                Cursor = 0L;
-                SampleLength = 0;
-                InputSampleRate = 0;
-                InputChannels = 0;
-                SequenceNumber = 0;
-                Timestamp = 0;
-                ReceivedTimestamp = 0;
-                IsSilence = false;
-            }
-        }
-
-        // Keep hot producer/consumer cursors on separate cache lines and make slot cursors monotonic.
-        [StructLayout(LayoutKind.Explicit, Size = 128)]
-        private sealed class PaddedLong
-        {
-            [FieldOffset(64)]
-            public long Value;
         }
 
         private sealed class SampleFifo

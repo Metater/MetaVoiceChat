@@ -479,7 +479,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.OnAudioFilterReadVcOutput
   audioFilterReadConfig: {fileID: 11400000, guid: 4767797422a28634ea36a91d1788f473, type: 2}
-  pendingFrameCapacity: 32
 --- !u!82 &1511361416
 AudioSource:
   m_ObjectHideFlags: 0
