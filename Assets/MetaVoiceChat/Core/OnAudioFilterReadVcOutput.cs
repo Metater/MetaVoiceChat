@@ -9,7 +9,7 @@ using UnityEngine;
 namespace MetaVoiceChat.Core
 {
     [RequireComponent(typeof(AudioSource))]
-    public sealed class OnAudioFilterReadVcOutput : MonoBehaviour, IVcOutput
+    public sealed class OnAudioFilterReadVcOutput : MonoBehaviour, IVcProcessor
     {
         // NetEQ constants
         public const int DefaultMaxPacketsInBuffer = 16;
