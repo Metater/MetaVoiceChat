@@ -11,12 +11,15 @@ namespace MetaVoiceChat.Core
     [RequireComponent(typeof(AudioSource))]
     public sealed class OnAudioFilterReadVcOutput : MonoBehaviour
     {
+        // NetEQ constants
         public const int DefaultMaxPacketsInBuffer = 16;
         public const int DefaultMaxDelayMs = 150;
         public const int DefaultMinDelayMs = 20;
         public const int DefaultAdditionalDelayMs = 0;
+        // Speex resampler constants
         public const int DefaultResamplerQuality = 4;
         public const int DefaultResamplerBufferMs = 10;
+        // Other constants
         private const int PendingFramePoolCapacity = 32;
         private const int MaxPacketDurationMs = 60;
         private const int MaxPendingFrameAgeMs = 250;
