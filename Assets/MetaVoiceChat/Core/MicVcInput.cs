@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -22,6 +23,10 @@ namespace MetaVoiceChat.Core
     [DisallowMultipleComponent]
     public sealed class MicVcInput : MonoBehaviour
     {
+        private static readonly List<MicVcInput> EnabledInstances = new List<MicVcInput>();
+        private static float nextMultipleInstancesErrorTime;
+        private static float nextExternalMicrophoneControlErrorTime;
+
         public const int InputChannels = 1;
         public const int ClipLoopSeconds = 3;
 
@@ -35,6 +40,7 @@ namespace MetaVoiceChat.Core
 
         private const VcFrequency DefaultFrequency = VcFrequency.Hz48000;
         private const VcMilliseconds DefaultMilliseconds = VcMilliseconds.Ms20;
+        private const float MicrophoneConflictErrorIntervalSeconds = 1f;
         private const float PositionStallStartupGraceSeconds = 1f;
         private const float PositionStallTimeoutSeconds = 2f;
 
@@ -269,6 +275,12 @@ namespace MetaVoiceChat.Core
                 return;
             }
 
+            PruneEnabledInstances();
+            if (!EnabledInstances.Contains(this))
+            {
+                EnabledInstances.Add(this);
+            }
+
             float reconnectInitialDelay = GetReconnectInitialDelay();
             nextReconnectAttemptTime = Time.realtimeSinceStartup + reconnectInitialDelay;
             reconnectRequested = false;
@@ -286,6 +298,7 @@ namespace MetaVoiceChat.Core
 
         private void OnDisable()
         {
+            EnabledInstances.Remove(this);
             reconnectRequested = false;
             StopPermissionRequest();
             StopRecordingInternal(resetActiveDevice: true);
@@ -308,6 +321,7 @@ namespace MetaVoiceChat.Core
             }
 
             ValidateSerializedSettings();
+            CheckMicrophoneSingletonConflicts();
             MaybeRefreshDevices();
 
             int oldRequestedFrequency = requestedFrequency;
@@ -549,6 +563,85 @@ namespace MetaVoiceChat.Core
                 ContainsDevice(selectedDevice))
             {
                 return true;
+            }
+
+            return false;
+        }
+
+        private void CheckMicrophoneSingletonConflicts()
+        {
+            PruneEnabledInstances();
+
+            float now = Time.realtimeSinceStartup;
+            if (EnabledInstances.Count > 1 && now >= nextMultipleInstancesErrorTime)
+            {
+                nextMultipleInstancesErrorTime = now + MicrophoneConflictErrorIntervalSeconds;
+                Debug.LogError(
+                    $"There are {EnabledInstances.Count} {nameof(MicVcInput)} instances active. Unity ONLY allows one active Microphone instance at a time, since it is a singleton. Disable all but one instance, or the microphone will break. For example, if you are trying to integrate voice chat with Vosk voice recognition, remove the Microphone usage elsewhere and integrate Vosk into the voice chat pipeline.",
+                    this);
+            }
+
+            if (now < nextExternalMicrophoneControlErrorTime)
+            {
+                return;
+            }
+
+            if (!IsUnityMicrophoneControlledByExternalCode())
+            {
+                return;
+            }
+
+            nextExternalMicrophoneControlErrorTime = now + MicrophoneConflictErrorIntervalSeconds;
+            Debug.LogError(
+                "Multiple scripts are controlling the Unity Microphone. Unity ONLY allows one active Microphone instance at a time, since it is a singleton. Disable all but one instance, or the microphone will break. For example, if you are trying to integrate voice chat with Vosk voice recognition, remove the Microphone usage elsewhere and integrate Vosk into the voice chat pipeline.",
+                this);
+        }
+
+        private bool IsUnityMicrophoneControlledByExternalCode()
+        {
+            for (int i = 0; i < devices.Length; i++)
+            {
+                string device = devices[i];
+                if (string.IsNullOrEmpty(device) || !Microphone.IsRecording(device))
+                {
+                    continue;
+                }
+
+                if (!IsDeviceOwnedByEnabledInstance(device))
+                {
+                    return true;
+                }
+            }
+
+            return isRecording &&
+                   !string.IsNullOrEmpty(activeDevice) &&
+                   ContainsDevice(activeDevice) &&
+                   !Microphone.IsRecording(activeDevice);
+        }
+
+        private static void PruneEnabledInstances()
+        {
+            for (int i = EnabledInstances.Count - 1; i >= 0; i--)
+            {
+                MicVcInput instance = EnabledInstances[i];
+                if (instance == null || !instance.isActiveAndEnabled)
+                {
+                    EnabledInstances.RemoveAt(i);
+                }
+            }
+        }
+
+        private static bool IsDeviceOwnedByEnabledInstance(string device)
+        {
+            for (int i = 0; i < EnabledInstances.Count; i++)
+            {
+                MicVcInput instance = EnabledInstances[i];
+                if (instance != null &&
+                    instance.isRecording &&
+                    instance.activeDevice == device)
+                {
+                    return true;
+                }
             }
 
             return false;
