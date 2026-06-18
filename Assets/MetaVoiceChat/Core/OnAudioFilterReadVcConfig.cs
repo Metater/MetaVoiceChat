@@ -5,6 +5,9 @@ namespace MetaVoiceChat.Core
     [CreateAssetMenu(fileName = "New OnAudioFilterRead VC Config", menuName = "MetaVoiceChat/OnAudioFilterReadVcConfig", order = 3)]
     public class OnAudioFilterReadVcConfig : ScriptableObject
     {
+        [TextArea(3, 10)]
+        public string notes;
+
         [Header("Resampling Settings")]
 
         [Tooltip("Quality used by the software resampler when NetEQ's sample rate differs from Unity's output sample rate. 0 is fastest and lowest quality; 10 is slowest and highest quality. Values above 4 are usually not recommended for real-time voice.")]
