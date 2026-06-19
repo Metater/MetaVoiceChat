@@ -99,7 +99,7 @@ namespace MetaVoiceChat.Core
         private int lastOutputPeakPpm;
         private int audioThreadExceptionCount;
         private string lastAudioThreadException;
-        private float nextDiagnosticsLogTime;
+        private double nextDiagnosticsLogTime;
 #endif
 
         public int CurrentBufferSizeMs
@@ -720,12 +720,12 @@ namespace MetaVoiceChat.Core
 #if LOG_OnAudioFilterReadVcOutput
         private void LogDiagnosticsIfNeeded()
         {
-            if (!logDiagnostics || Time.unscaledTime < nextDiagnosticsLogTime)
+            if (!logDiagnostics || Time.unscaledTimeAsDouble < nextDiagnosticsLogTime)
             {
                 return;
             }
 
-            nextDiagnosticsLogTime = Time.unscaledTime + Math.Max(0.1f, diagnosticsLogIntervalSeconds);
+            nextDiagnosticsLogTime = Time.unscaledTimeAsDouble + Math.Max(0.1f, diagnosticsLogIntervalSeconds);
 
             string exception = lastAudioThreadException;
             if (string.IsNullOrEmpty(exception))

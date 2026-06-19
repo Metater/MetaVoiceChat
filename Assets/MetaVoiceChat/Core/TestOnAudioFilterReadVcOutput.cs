@@ -59,7 +59,7 @@ namespace MetaVoiceChat.Core
         private int pendingPrerollFrames;
 #if LOG_TestOnAudioFilterReadVcOutput
         private int sentFrameCount;
-        private float nextGeneratorDiagnosticsLogTime;
+        private double nextGeneratorDiagnosticsLogTime;
 #endif
 
         public bool IsFeeding
@@ -328,12 +328,12 @@ namespace MetaVoiceChat.Core
 #if LOG_TestOnAudioFilterReadVcOutput
         private void LogGeneratorDiagnosticsIfNeeded()
         {
-            if (!logGeneratorDiagnostics || Time.unscaledTime < nextGeneratorDiagnosticsLogTime)
+            if (!logGeneratorDiagnostics || Time.unscaledTimeAsDouble < nextGeneratorDiagnosticsLogTime)
             {
                 return;
             }
 
-            nextGeneratorDiagnosticsLogTime = Time.unscaledTime + Math.Max(0.1f, generatorDiagnosticsLogIntervalSeconds);
+            nextGeneratorDiagnosticsLogTime = Time.unscaledTimeAsDouble + Math.Max(0.1f, generatorDiagnosticsLogIntervalSeconds);
             CacheValidatedSettings(out int sampleRate, out int channels, out int frameSamplesPerChannel);
 
             UnityEngine.Debug.Log(
