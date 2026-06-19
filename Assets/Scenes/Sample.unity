@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
+  - component: {fileID: 330585548}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -256,6 +257,18 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &330585548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba1434dbd891d944c9affa168f62bb8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.AudioListenerVcInput
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -432,7 +445,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &8894340282797913355
+--- !u!1001 &1954026175
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -446,15 +459,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3744557484082645481, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -3.13478
       objectReference: {fileID: 0}
     - target: {fileID: 3744557484082645481, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: -2.09341
       objectReference: {fileID: 0}
     - target: {fileID: 3744557484082645481, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -8.18981
       objectReference: {fileID: 0}
     - target: {fileID: 3744557484082645481, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
       propertyPath: m_LocalRotation.w
@@ -496,4 +509,4 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 832575519}
-  - {fileID: 8894340282797913355}
+  - {fileID: 1954026175}

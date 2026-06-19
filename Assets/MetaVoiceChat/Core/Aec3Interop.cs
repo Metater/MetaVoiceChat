@@ -25,8 +25,9 @@ namespace MetaVoiceChat.Core
         public const int StatusPanic = -99;
         public const int StatusBusy = -1000;
 
-        private const int MaxRenderChannels = 8;
-        private const int MaxRenderSamples = 48000 * 40 / 1000 * MaxRenderChannels;
+        public const int MaxRenderChannels = 8;
+        public const int MaxRenderFrameSamples = 48000 * 40 / 1000 * MaxRenderChannels;
+        private const int MaxRenderSamples = MaxRenderFrameSamples;
 
 #pragma warning disable 0169
         private static IntPtr loadedNativeLibrary;
@@ -143,6 +144,11 @@ namespace MetaVoiceChat.Core
             public NativeStats Native { get; private set; }
 
             public float[] FftMagnitudes { get; private set; }
+
+            public int FftCapacity
+            {
+                get { return fftCapacity; }
+            }
 
             internal IntPtr NativePointer
             {
@@ -293,6 +299,16 @@ namespace MetaVoiceChat.Core
             public int FftBinsPerFrame
             {
                 get { return Volatile.Read(ref fftBinsPerFrame); }
+            }
+
+            public int RenderSampleRateHz
+            {
+                get { return Volatile.Read(ref renderSampleRateHz); }
+            }
+
+            public int FrameSizeMs
+            {
+                get { return Volatile.Read(ref frameSizeMs); }
             }
 
             public int QueuedRenderFrames
@@ -806,6 +822,11 @@ namespace MetaVoiceChat.Core
         public static int NativeStatusNeedsRnnoise()
         {
             return meta_aec3_status_needs_rnnoise();
+        }
+
+        public static bool IsSuccessStatus(int status)
+        {
+            return status >= StatusOk;
         }
 
         public static void ThrowIfError(int status)
