@@ -32,13 +32,13 @@ namespace MetaVoiceChat.Core
         [SerializeField, Min(0)] private int initialDelayMs;
 
         [Header("Noise Suppression")]
-        [SerializeField] private Aec3Interop.NoiseSuppressionMode noiseSuppressionMode = Aec3Interop.NoiseSuppressionMode.WebRtc;
-        [SerializeField] private Aec3Interop.NoiseSuppressionLevel noiseSuppressionLevel = Aec3Interop.NoiseSuppressionLevel.Db12;
+        [SerializeField] private Aec3Interop.NoiseSuppressionMode noiseSuppressionMode = Aec3Interop.NoiseSuppressionMode.None;
+        [SerializeField] private Aec3Interop.NoiseSuppressionLevel noiseSuppressionLevel = Aec3Interop.NoiseSuppressionLevel.Db6;
 
         [Header("AGC")]
         [SerializeField] private bool enableAgc2 = true;
         [SerializeField, Range(0f, 49f)] private float agc2FixedGainDb;
-        [SerializeField] private bool agc2AdaptiveDigital = true;
+        [SerializeField] private bool agc2AdaptiveDigital;
         [SerializeField] private bool agc2InputVolumeController;
         [SerializeField, Range(0, 255)] private int appliedInputVolume = 255;
 
@@ -49,8 +49,8 @@ namespace MetaVoiceChat.Core
         [Header("Native Taps")]
         [SerializeField] private bool captureOutputUsed = true;
         [SerializeField] private bool exportLinearAecOutput;
-        [SerializeField] private bool publishSpeech16kFrames = true;
-        [SerializeField] private bool publishRnnoiseInputFrames = true;
+        [SerializeField] private bool publishSpeech16kFrames;
+        [SerializeField] private bool publishRnnoiseInputFrames;
         [SerializeField] private bool collectStats = true;
         [SerializeField, Min(0)] private int fftCapacity = 256;
         [SerializeField, Range(0f, 1f)] private float vadThreshold = 0.5f;
@@ -999,12 +999,12 @@ namespace MetaVoiceChat.Core
 
             if (!Enum.IsDefined(typeof(Aec3Interop.NoiseSuppressionMode), noiseSuppressionMode))
             {
-                noiseSuppressionMode = Aec3Interop.NoiseSuppressionMode.WebRtc;
+                noiseSuppressionMode = Aec3Interop.NoiseSuppressionMode.None;
             }
 
             if (!Enum.IsDefined(typeof(Aec3Interop.NoiseSuppressionLevel), noiseSuppressionLevel))
             {
-                noiseSuppressionLevel = Aec3Interop.NoiseSuppressionLevel.Db12;
+                noiseSuppressionLevel = Aec3Interop.NoiseSuppressionLevel.Db6;
             }
         }
 
