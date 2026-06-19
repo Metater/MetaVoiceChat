@@ -82,7 +82,7 @@ MonoBehaviour:
   initialDelayMs: 0
   noiseSuppressionMode: 0
   noiseSuppressionLevel: 0
-  enableAgc2: 1
+  enableAgc2: 0
   agc2FixedGainDb: 0
   agc2AdaptiveDigital: 0
   agc2InputVolumeController: 0

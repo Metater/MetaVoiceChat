@@ -457,6 +457,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Echo Microphone Sample
       objectReference: {fileID: 0}
+    - target: {fileID: 3516618325411073950, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3744557484082645481, guid: 24d742269b8dc5d40ba9132d47bc6592, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
