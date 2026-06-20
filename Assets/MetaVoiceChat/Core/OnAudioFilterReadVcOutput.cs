@@ -23,8 +23,8 @@ namespace MetaVoiceChat.Core
         private const int PendingFramePoolCapacity = 32;
         private const int MaxPacketDurationMs = 60;
         private const int MaxPendingFrameAgeMs = 250;
-        private const int MaxPacketsDrainedPerCallback = 16;
-        private const int MaxNetEqReadsPerCallback = 16;
+        private const int MaxPacketsDrainedPerCallback = 32;
+        private const int MaxNetEqReadsPerCallback = 32;
 
         [SerializeField] private OnAudioFilterReadVcConfig audioFilterReadConfig;
         private const bool createPlaybackClip = true;
@@ -812,6 +812,7 @@ namespace MetaVoiceChat.Core
             int dspMs = outputSampleRate > 0 ? bufferLength * numBuffers * 1000 / outputSampleRate : 0;
             Volatile.Write(ref cachedDspBufferMs, dspMs);
 
+            // not entirely sure if previousOutputSampleRate != 0 is needed
             if (previousOutputSampleRate != 0 &&
                 (previousOutputSampleRate != outputSampleRate ||
                     previousOutputChannels != Volatile.Read(ref cachedOutputChannels) ||
@@ -832,7 +833,7 @@ namespace MetaVoiceChat.Core
             Volatile.Write(ref cachedMaxDelayMs, maxDelayMs);
             Volatile.Write(ref cachedMinDelayMs, minDelayMs);
             Volatile.Write(ref cachedAdditionalDelayMs, additionalDelayMs);
-            Volatile.Write(ref cachedResamplerQuality, Mathf.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
+            Volatile.Write(ref cachedResamplerQuality, Math.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
             Volatile.Write(ref cachedResamplerBufferMs, Math.Clamp(config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs, 10, 100));
             Volatile.Write(
                 ref cachedNetEqConfigHash,
