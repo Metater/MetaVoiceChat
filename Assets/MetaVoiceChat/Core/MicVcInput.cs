@@ -613,10 +613,11 @@ namespace MetaVoiceChat.Core
                 }
             }
 
-            return isRecording &&
-                   !string.IsNullOrEmpty(activeDevice) &&
-                   ContainsDevice(activeDevice) &&
-                   !Microphone.IsRecording(activeDevice);
+            // A microphone that Unity has stopped is not evidence that another script
+            // owns it. This can happen transiently while Unity rebuilds the audio
+            // device/configuration, including after runtime audio setting changes.
+            // ShouldReconnect handles that condition and restores this capture.
+            return false;
         }
 
         private static void PruneEnabledInstances()

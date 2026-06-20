@@ -13,10 +13,11 @@ namespace MetaVoiceChat.Core
     public sealed class OnAudioFilterReadVcOutput : MonoBehaviour, IVcProcessor
     {
         // NetEQ constants
-        public const int DefaultMaxPacketsInBuffer = 16;
+        public const int DefaultMaxPacketsInBuffer = 50;
         public const int DefaultMaxDelayMs = 150;
         public const int DefaultMinDelayMs = 20;
         public const int DefaultAdditionalDelayMs = 0;
+        public const OnAudioFilterReadVcConfig.JitterBufferMode DefaultJitterBufferMode = OnAudioFilterReadVcConfig.JitterBufferMode.Balanced;
         // Speex resampler constants
         public const int DefaultResamplerQuality = 4;
         public const int DefaultResamplerBufferMs = 10;
