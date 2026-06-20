@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.Assertions;
 
 namespace MetaVoiceChat.Core
 {
@@ -206,7 +207,6 @@ namespace MetaVoiceChat.Core
             CacheMainThreadSettings();
             InitializePendingFramePool();
             ClearPendingFrames();
-            TryPreloadNetEqNativeLibrary();
 
             if (!TryGetComponent(out audioSource))
             {
@@ -304,25 +304,6 @@ namespace MetaVoiceChat.Core
             }
         }
 
-        private void TryPreloadNetEqNativeLibrary()
-        {
-            try
-            {
-                //NetEqInterop.PreloadNativeLibrary(Application.dataPath);
-            }
-            catch (Exception exception)
-            {
-#if LOG_OnAudioFilterReadVcOutput
-                UnityEngine.Debug.LogError(
-                    $"{nameof(OnAudioFilterReadVcOutput)} failed to preload NetEQ native library: " +
-                    $"{exception.GetType().Name}: {exception.Message}",
-                    this);
-#else
-                _ = exception;
-#endif
-            }
-        }
-
         private void OnAudioFilterRead(float[] data, int channels)
         {
             if (data == null)
@@ -389,6 +370,7 @@ namespace MetaVoiceChat.Core
                 FillOutputFifo(data.Length, outputSampleRate, channels);
 
                 int copied = outputFifo.Read(data, 0, data.Length);
+                Assert.AreEqual(copied, data.Length, "Expected data read from output FIFO to match DSP buffer size.");
                 if (copied < data.Length)
                 {
                     Array.Clear(data, copied, data.Length - copied);

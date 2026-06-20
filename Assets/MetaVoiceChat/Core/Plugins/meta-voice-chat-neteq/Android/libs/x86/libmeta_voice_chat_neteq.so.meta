@@ -6,7 +6,7 @@ PluginImporter:
   iconMap: {}
   executionOrder: {}
   defineConstraints: []
-  isPreloaded: 0
+  isPreloaded: 1
   isOverridable: 0
   isExplicitlyReferenced: 0
   validateReferences: 1
@@ -15,6 +15,7 @@ PluginImporter:
       enabled: 1
       settings:
         CPU: x86
+        Is16KbAligned: false
     Any:
       enabled: 0
       settings:
@@ -26,7 +27,7 @@ PluginImporter:
     Editor:
       enabled: 0
       settings:
-        CPU: None
+        CPU: AnyCPU
         DefaultValueInitialized: true
         OS: AnyOS
     Linux64:

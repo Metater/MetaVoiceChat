@@ -6,11 +6,15 @@ PluginImporter:
   iconMap: {}
   executionOrder: {}
   defineConstraints: []
-  isPreloaded: 0
+  isPreloaded: 1
   isOverridable: 0
   isExplicitlyReferenced: 0
   validateReferences: 1
   platformData:
+    Android:
+      enabled: 0
+      settings:
+        Is16KbAligned: false
     Any:
       enabled: 0
       settings:
@@ -22,13 +26,13 @@ PluginImporter:
     Editor:
       enabled: 0
       settings:
-        CPU: None
+        CPU: AnyCPU
         DefaultValueInitialized: true
         OS: Linux
     Linux64:
       enabled: 1
       settings:
-        CPU: ARMv7
+        CPU: AnyCPU
     OSXUniversal:
       enabled: 0
       settings:
