@@ -61,8 +61,8 @@ namespace MetaVoiceChat.Core.Editor
             OnAudioFilterReadVcConfig.JitterBufferMode mode,
             int packetDurationMs)
         {
-            int minDelayMs = (int)OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, mode, null);
-            int maxDelayMs = (int)OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, mode, null);
+            int minDelayMs = OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, mode, null);
+            int maxDelayMs = OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, mode, null);
 
             EditorGUILayout.LabelField($"{packetDurationMs} ms Packets", EditorStyles.miniBoldLabel);
             EditorGUILayout.IntField("Minimum Delay (ms)", minDelayMs);

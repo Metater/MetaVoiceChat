@@ -825,11 +825,11 @@ namespace MetaVoiceChat.Core
             int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
             int minDelayMs = Math.Max(
                 0,
-                (int)OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, jitterBufferMode, config));
+                OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, jitterBufferMode, config));
             int maxDelayMs = Math.Max(
                 minDelayMs,
-                (int)OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, jitterBufferMode, config));
-            int additionalDelayMs = Math.Max(0, config != null ? (int)config.additionalDelayMs : DefaultAdditionalDelayMs);
+                OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, jitterBufferMode, config));
+            int additionalDelayMs = Math.Max(0, config != null ? config.additionalDelayMs : DefaultAdditionalDelayMs);
 
             Volatile.Write(ref cachedMaxPacketsInBuffer, maxPacketsInBuffer);
             Volatile.Write(ref cachedMaxDelayMs, maxDelayMs);

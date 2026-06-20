@@ -25,18 +25,18 @@ namespace MetaVoiceChat.Core
 
         [Tooltip("Extra fixed delay added on top of NetEQ's adaptive jitter buffer. Leave at 0 for lowest latency; increase only if you intentionally want more buffering for stability or synchronization.")]
         [Range(0, 200)]
-        public uint additionalDelayMs = OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs;
+        public int additionalDelayMs = OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs;
 
         [Tooltip("Controls NetEQ's adaptive jitter-buffer delay. Low Latency keeps voice more responsive but may glitch more on uneven packet timing. Balanced is recommended for most games. Stable allows more delay to smooth out worse network or frame timing. Custom uses the Max Delay and Min Delay values below.")]
         public JitterBufferMode jitterBufferMode = OnAudioFilterReadVcOutput.DefaultJitterBufferMode;
 
         [Tooltip("Only used when Jitter Buffer Mode is Custom. Minimum adaptive jitter-buffer delay in milliseconds. Higher values can make playback steadier but add baseline latency. Keep this at or below Max Delay; the runtime should clamp Max Delay upward if needed.")]
         [Range(0, 300)]
-        public uint customMinDelayMs = 20;
+        public int customMinDelayMs = 20;
 
         [Tooltip("Only used when Jitter Buffer Mode is Custom. Maximum adaptive jitter-buffer delay in milliseconds. Lower values feel more responsive; higher values tolerate shakier network timing at the cost of possible added latency.")]
         [Range(0, 500)]
-        public uint customMaxDelayMs = 150;
+        public int customMaxDelayMs = 150;
 
         public int ResamplerBufferMs
         {
@@ -56,17 +56,17 @@ namespace MetaVoiceChat.Core
             Custom,
         }
 
-        public static uint GetMinDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
+        public static int GetMinDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
         {
             if (mode == JitterBufferMode.Custom && config != null)
             {
                 return config.customMinDelayMs;
             }
 
-            return (uint)packetMs;
+            return packetMs;
         }
 
-        public static uint GetMaxDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
+        public static int GetMaxDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
         {
             if (mode == JitterBufferMode.Custom && config != null)
             {
@@ -80,7 +80,7 @@ namespace MetaVoiceChat.Core
                     10 => 60,
                     20 => 80,
                     40 => 120,
-                    _ => (uint)Math.Clamp(packetMs * 4, 60, 160)
+                    _ => Math.Clamp(packetMs * 4, 60, 160)
                 },
 
                 JitterBufferMode.Stable => packetMs switch
@@ -88,7 +88,7 @@ namespace MetaVoiceChat.Core
                     10 => 100,
                     20 => 140,
                     40 => 200,
-                    _ => (uint)Math.Clamp(packetMs * 6, 100, 240)
+                    _ => Math.Clamp(packetMs * 6, 100, 240)
                 },
 
                 JitterBufferMode.Balanced or _ => packetMs switch
@@ -96,7 +96,7 @@ namespace MetaVoiceChat.Core
                     10 => 80,
                     20 => 100,
                     40 => 140,
-                    _ => (uint)Math.Clamp(packetMs * 5, 80, 200)
+                    _ => Math.Clamp(packetMs * 5, 80, 200)
                 }
             };
         }

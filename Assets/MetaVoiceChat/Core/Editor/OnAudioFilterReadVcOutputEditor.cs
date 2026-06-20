@@ -7,8 +7,6 @@ namespace MetaVoiceChat.Core.Editor
     [CanEditMultipleObjects]
     public sealed class OnAudioFilterReadVcOutputEditor : UnityEditor.Editor
     {
-        private const int RecommendedMinPacketsInBuffer = 4;
-        private const int RecommendedMaxPacketsInBuffer = 64;
         private const int RecommendedMinMaxDelayMs = 40;
         private const int RecommendedMaxDelayMs = 300;
         private const int RecommendedMaxAdditionalDelayMs = 100;
@@ -101,20 +99,6 @@ namespace MetaVoiceChat.Core.Editor
                     "Invalid Packet Buffer",
                     "Max Packets In Buffer must be at least 1. The runtime clamps this, but the asset value should be corrected.",
                     MessageType.Error);
-            }
-            else if (maxPacketsInBuffer != null && maxPackets < RecommendedMinPacketsInBuffer)
-            {
-                DrawPanel(
-                    "Tiny Packet Buffer",
-                    $"Max Packets In Buffer is below {RecommendedMinPacketsInBuffer}. This leaves very little room for jitter bursts and can make playback underrun.",
-                    MessageType.Warning);
-            }
-            else if (maxPacketsInBuffer != null && maxPackets > RecommendedMaxPacketsInBuffer)
-            {
-                DrawPanel(
-                    "Large Packet Buffer",
-                    $"Max Packets In Buffer is above {RecommendedMaxPacketsInBuffer}. This can hide queueing problems and allow more voice audio to build up before playback catches up.",
-                    MessageType.Warning);
             }
 
             if (minDelayMs != null &&
