@@ -308,7 +308,7 @@ namespace MetaVoiceChat.Core
         {
             try
             {
-                NetEqInterop.PreloadNativeLibrary(Application.dataPath);
+                //NetEqInterop.PreloadNativeLibrary(Application.dataPath);
             }
             catch (Exception exception)
             {
