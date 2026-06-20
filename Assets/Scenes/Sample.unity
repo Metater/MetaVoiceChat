@@ -793,7 +793,7 @@ MonoBehaviour:
   vcPipeline: {fileID: 6835464071420841916}
   micVcConfig: {fileID: 11400000, guid: 951f1909053e12243ab920db0bfa2143, type: 2}
   vcFrequency: 0
-  vcMilliseconds: 0
+  vcMilliseconds: 2
   selectedDevice: 
   onActiveDeviceChanged:
     m_PersistentCalls:
