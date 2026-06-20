@@ -79,7 +79,7 @@ MonoBehaviour:
   enableAec3: 1
   renderQueueCapacity: 8
   feedAudioListenerRender: 1
-  initialDelayMs: 0
+  initialDelayMs: 180
   noiseSuppressionMode: 0
   noiseSuppressionLevel: 0
   enableAgc2: 0
@@ -94,7 +94,7 @@ MonoBehaviour:
   publishSpeech16kFrames: 0
   publishRnnoiseInputFrames: 0
   collectStats: 1
-  fftCapacity: 256
+  fftCapacity: 1024
   vadThreshold: 0.5
   forwardOriginalOnNativeFailure: 1
   logNativeErrors: 1

@@ -48,6 +48,7 @@ namespace MetaVoiceChat.Core
             Db21 = 3
         }
 
+        [Serializable]
         [StructLayout(LayoutKind.Sequential)]
         public struct Config
         {
@@ -73,6 +74,7 @@ namespace MetaVoiceChat.Core
             public int ExportLinearAecOutput;
         }
 
+        [Serializable]
         [StructLayout(LayoutKind.Sequential)]
         public struct NativeStats
         {
