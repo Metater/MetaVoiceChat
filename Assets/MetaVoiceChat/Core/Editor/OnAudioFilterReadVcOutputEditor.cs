@@ -73,7 +73,7 @@ namespace MetaVoiceChat.Core.Editor
             {
                 DrawPanel(
                     "Default NetEQ Settings",
-                    $"No config asset is assigned. For 20 ms packets, the output will use defaults: {OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer} packets, {OnAudioFilterReadVcConfig.GetMinDelayMs(20, OnAudioFilterReadVcOutput.DefaultJitterBufferMode, null)}-{OnAudioFilterReadVcConfig.GetMaxDelayMs(20, OnAudioFilterReadVcOutput.DefaultJitterBufferMode, null)} ms NetEQ delay, {OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs} ms additional delay, quality {OnAudioFilterReadVcOutput.DefaultResamplerQuality}, and a {OnAudioFilterReadVcOutput.DefaultResamplerBufferMs} ms local output buffer target. NetEQ GetAudio is pulled in 10 ms chunks.",
+                    $"No config asset is assigned. For 20 ms packets, the output will use defaults: {OnAudioFilterReadVcOutput.DefaultMaxPacketsInBuffer} packets, {OnAudioFilterReadVcConfig.GetMinDelayMs(20, OnAudioFilterReadVcOutput.DefaultJitterBufferMode)}-{OnAudioFilterReadVcConfig.GetMaxDelayMs(20, OnAudioFilterReadVcOutput.DefaultJitterBufferMode)} ms NetEQ delay, {OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs} ms additional delay, quality {OnAudioFilterReadVcOutput.DefaultResamplerQuality}, and a {OnAudioFilterReadVcOutput.DefaultResamplerBufferMs} ms local output buffer target. NetEQ GetAudio is pulled in 10 ms chunks.",
                     MessageType.Info);
                 return;
             }

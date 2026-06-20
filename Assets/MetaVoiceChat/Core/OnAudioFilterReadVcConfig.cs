@@ -56,23 +56,13 @@ namespace MetaVoiceChat.Core
             Custom,
         }
 
-        public static int GetMinDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
+        public static int GetMinDelayMs(int packetMs, JitterBufferMode mode)
         {
-            if (mode == JitterBufferMode.Custom && config != null)
-            {
-                return config.customMinDelayMs;
-            }
-
             return packetMs;
         }
 
-        public static int GetMaxDelayMs(int packetMs, JitterBufferMode mode, OnAudioFilterReadVcConfig config)
+        public static int GetMaxDelayMs(int packetMs, JitterBufferMode mode)
         {
-            if (mode == JitterBufferMode.Custom && config != null)
-            {
-                return config.customMaxDelayMs;
-            }
-
             return mode switch
             {
                 JitterBufferMode.LowLatency => packetMs switch

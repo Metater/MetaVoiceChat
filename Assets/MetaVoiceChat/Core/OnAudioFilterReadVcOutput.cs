@@ -54,14 +54,14 @@ namespace MetaVoiceChat.Core
         private int cachedDspBufferLength;
         private int cachedDspBufferCount;
         private int cachedDspBufferMs;
-        private int cachedMaxPacketsInBuffer = DefaultMaxPacketsInBuffer;
-        private int cachedMaxDelayMs;
-        private int cachedMinDelayMs;
-        private int cachedAdditionalDelayMs = DefaultAdditionalDelayMs;
         private int cachedResamplerQuality = DefaultResamplerQuality;
         private int cachedResamplerBufferMs = DefaultResamplerBufferMs;
-        private int cachedNetEqConfigHash;
-        private int cachedPacketDurationMs = 20;
+        private NetEqSettingsSnapshot cachedNetEqSettings = new NetEqSettingsSnapshot(
+            DefaultMaxPacketsInBuffer,
+            DefaultAdditionalDelayMs,
+            DefaultJitterBufferMode,
+            0,
+            0);
 
         private int currentBufferSizeMs;
         private int receiveToInsertLatencyMs;
@@ -79,7 +79,7 @@ namespace MetaVoiceChat.Core
         private float[] spatializationInputBuffer = Array.Empty<float>();
         private int netEqSampleRate;
         private int netEqChannels;
-        private int audioThreadNetEqConfigHash;
+        private NetEqConfig audioThreadNetEqConfig;
         private int audioThreadOutputSampleRate;
         private int audioThreadOutputChannels;
 
@@ -175,9 +175,7 @@ namespace MetaVoiceChat.Core
                 pendingFrame.ReceivedTimestamp = Stopwatch.GetTimestamp();
                 pendingFrame.IsSilence = isSilence;
 
-                int samplesPerChannel = frameSize / inputChannels;
-                int packetDurationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / inputFrequency));
-                Volatile.Write(ref cachedPacketDurationMs, packetDurationMs);
+                pendingFrame.NetEqConfig = GetCachedNetEqConfig(frameSize / inputChannels, inputFrequency);
 
                 if (Volatile.Read(ref acceptingFrames) == 0)
                 {
@@ -339,12 +337,6 @@ namespace MetaVoiceChat.Core
                     return;
                 }
 
-                int netEqConfigHash = Volatile.Read(ref cachedNetEqConfigHash);
-                if (netEq != null && audioThreadNetEqConfigHash != netEqConfigHash)
-                {
-                    DisposeAudioThreadState();
-                }
-
                 if (Interlocked.Exchange(ref resetAudioThreadStateRequested, 0) != 0)
                 {
                     DisposeAudioThreadState();
@@ -418,7 +410,7 @@ namespace MetaVoiceChat.Core
                         continue;
                     }
 
-                    if (!EnsureNetEqFor(frame.InputSampleRate, frame.InputChannels))
+                    if (!EnsureNetEqFor(frame.InputSampleRate, frame.InputChannels, frame.NetEqConfig))
                     {
                         continue;
                     }
@@ -434,9 +426,6 @@ namespace MetaVoiceChat.Core
                         packetSamples = frame.Samples;
                     }
 
-                    int samplesPerChannel = frame.SampleLength / frame.InputChannels;
-                    int durationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / frame.InputSampleRate));
-
                     netEq.InsertPacket(
                         frame.SequenceNumber,
                         frame.Timestamp,
@@ -444,7 +433,7 @@ namespace MetaVoiceChat.Core
                         frame.SampleLength,
                         frame.InputSampleRate,
                         frame.InputChannels,
-                        durationMs);
+                        frame.NetEqConfig.PacketDurationMs);
 
                     Volatile.Write(
                         ref receiveToInsertLatencyMs,
@@ -466,14 +455,17 @@ namespace MetaVoiceChat.Core
             }
         }
 
-        private bool EnsureNetEqFor(int sampleRate, int channels)
+        private bool EnsureNetEqFor(int sampleRate, int channels, NetEqConfig config)
         {
             if (sampleRate <= 0 || channels <= 0 || channels > 2)
             {
                 return false;
             }
 
-            if (netEq != null && netEqSampleRate == sampleRate && netEqChannels == channels)
+            if (netEq != null &&
+                netEqSampleRate == sampleRate &&
+                netEqChannels == channels &&
+                audioThreadNetEqConfig.Equals(config))
             {
                 return true;
             }
@@ -483,14 +475,14 @@ namespace MetaVoiceChat.Core
             netEq = NetEqInterop.Create(
                 sampleRate,
                 channels,
-                Volatile.Read(ref cachedMaxPacketsInBuffer),
-                Volatile.Read(ref cachedMaxDelayMs),
-                Volatile.Read(ref cachedMinDelayMs),
-                Volatile.Read(ref cachedAdditionalDelayMs));
+                config.MaxPacketsInBuffer,
+                config.MaxDelayMs,
+                config.MinDelayMs,
+                config.AdditionalDelayMs);
 
             netEqSampleRate = sampleRate;
             netEqChannels = channels;
-            audioThreadNetEqConfigHash = Volatile.Read(ref cachedNetEqConfigHash);
+            audioThreadNetEqConfig = config;
 #if LOG_OnAudioFilterReadVcOutput
             Interlocked.Increment(ref netEqCreateCount);
 #endif
@@ -652,7 +644,7 @@ namespace MetaVoiceChat.Core
             outputFifo.Clear();
             netEqSampleRate = 0;
             netEqChannels = 0;
-            audioThreadNetEqConfigHash = 0;
+            audioThreadNetEqConfig = default;
             audioThreadOutputSampleRate = 0;
             audioThreadOutputChannels = 0;
 
@@ -798,7 +790,7 @@ namespace MetaVoiceChat.Core
             int dspMs = outputSampleRate > 0 ? bufferLength * numBuffers * 1000 / outputSampleRate : 0;
             Volatile.Write(ref cachedDspBufferMs, dspMs);
 
-            // not entirely sure if previousOutputSampleRate != 0 is needed
+            // Avoid treating the initial cache population as an audio configuration change.
             if (previousOutputSampleRate != 0 &&
                 (previousOutputSampleRate != outputSampleRate ||
                     previousOutputChannels != Volatile.Read(ref cachedOutputChannels) ||
@@ -809,39 +801,70 @@ namespace MetaVoiceChat.Core
                 Volatile.Write(ref recreatePlaybackClipRequested, 1);
             }
 
-            CacheNetEqConfig(Math.Max(1, Volatile.Read(ref cachedPacketDurationMs)));
-
             OnAudioFilterReadVcConfig config = audioFilterReadConfig;
+            CacheNetEqSettings(config);
             Volatile.Write(ref cachedResamplerQuality, Math.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
             Volatile.Write(ref cachedResamplerBufferMs, Math.Clamp(config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs, 10, 100));
         }
 
-        private void CacheNetEqConfig(int packetDurationMs)
+        private void CacheNetEqSettings(OnAudioFilterReadVcConfig config)
         {
-            OnAudioFilterReadVcConfig config = audioFilterReadConfig;
+            int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
+            int additionalDelayMs = Math.Max(0, config != null ? config.additionalDelayMs : DefaultAdditionalDelayMs);
             OnAudioFilterReadVcConfig.JitterBufferMode jitterBufferMode = config != null
                 ? config.jitterBufferMode
                 : DefaultJitterBufferMode;
-            int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
-            int minDelayMs = Math.Max(
-                0,
-                OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, jitterBufferMode, config));
-            int maxDelayMs = Math.Max(
-                minDelayMs,
-                OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, jitterBufferMode, config));
-            int additionalDelayMs = Math.Max(0, config != null ? config.additionalDelayMs : DefaultAdditionalDelayMs);
+            int customMinDelayMs = Math.Max(0, config != null ? config.customMinDelayMs : 0);
+            int customMaxDelayMs = Math.Max(0, config != null ? config.customMaxDelayMs : 0);
 
-            Volatile.Write(ref cachedMaxPacketsInBuffer, maxPacketsInBuffer);
-            Volatile.Write(ref cachedMaxDelayMs, maxDelayMs);
-            Volatile.Write(ref cachedMinDelayMs, minDelayMs);
-            Volatile.Write(ref cachedAdditionalDelayMs, additionalDelayMs);
-            Volatile.Write(
-                ref cachedNetEqConfigHash,
-                HashNetEqConfig(
+            NetEqSettingsSnapshot currentSettings = Volatile.Read(ref cachedNetEqSettings);
+            if (currentSettings.Matches(
                     maxPacketsInBuffer,
-                    maxDelayMs,
-                    minDelayMs,
-                    additionalDelayMs));
+                    additionalDelayMs,
+                    jitterBufferMode,
+                    customMinDelayMs,
+                    customMaxDelayMs))
+            {
+                return;
+            }
+
+            NetEqSettingsSnapshot settings = new NetEqSettingsSnapshot(
+                maxPacketsInBuffer,
+                additionalDelayMs,
+                jitterBufferMode,
+                customMinDelayMs,
+                customMaxDelayMs);
+            Volatile.Write(ref cachedNetEqSettings, settings);
+        }
+
+        private NetEqConfig GetCachedNetEqConfig(int samplesPerChannel, int sampleRate)
+        {
+            NetEqSettingsSnapshot settings = Volatile.Read(ref cachedNetEqSettings);
+
+            int packetDurationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / sampleRate));
+            int minDelayMs;
+            int maxDelayMs;
+
+            if (settings.JitterBufferMode == OnAudioFilterReadVcConfig.JitterBufferMode.Custom)
+            {
+                minDelayMs = settings.CustomMinDelayMs;
+                maxDelayMs = settings.CustomMaxDelayMs;
+            }
+            else
+            {
+                minDelayMs = OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, settings.JitterBufferMode);
+                maxDelayMs = OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, settings.JitterBufferMode);
+            }
+
+            minDelayMs = Math.Max(0, minDelayMs);
+            maxDelayMs = Math.Max(minDelayMs, maxDelayMs);
+
+            return new NetEqConfig(
+                packetDurationMs,
+                settings.MaxPacketsInBuffer,
+                maxDelayMs,
+                minDelayMs,
+                settings.AdditionalDelayMs);
         }
 
         private void CreatePlaybackClip(bool forceRecreate = false)
@@ -957,23 +980,6 @@ namespace MetaVoiceChat.Core
             }
         }
 
-        private static int HashNetEqConfig(
-            int maxPacketsInBuffer,
-            int maxDelayMs,
-            int minDelayMs,
-            int additionalDelayMs)
-        {
-            unchecked
-            {
-                int hash = 17;
-                hash = hash * 31 + maxPacketsInBuffer;
-                hash = hash * 31 + maxDelayMs;
-                hash = hash * 31 + minDelayMs;
-                hash = hash * 31 + additionalDelayMs;
-                return hash;
-            }
-        }
-
         private static bool IsValidFrameShape(int frameSize, int inputSampleRate, int inputChannels)
         {
             if (frameSize <= 0 ||
@@ -1048,6 +1054,7 @@ namespace MetaVoiceChat.Core
             public uint Timestamp;
             public long ReceivedTimestamp;
             public bool IsSilence;
+            public NetEqConfig NetEqConfig;
 
             public void EnsureCapacity(int requiredSamples)
             {
@@ -1055,6 +1062,85 @@ namespace MetaVoiceChat.Core
                 {
                     Samples = new float[requiredSamples];
                 }
+            }
+        }
+
+        private sealed class NetEqSettingsSnapshot
+        {
+            public readonly int MaxPacketsInBuffer;
+            public readonly int AdditionalDelayMs;
+            public readonly OnAudioFilterReadVcConfig.JitterBufferMode JitterBufferMode;
+            public readonly int CustomMinDelayMs;
+            public readonly int CustomMaxDelayMs;
+
+            public NetEqSettingsSnapshot(
+                int maxPacketsInBuffer,
+                int additionalDelayMs,
+                OnAudioFilterReadVcConfig.JitterBufferMode jitterBufferMode,
+                int customMinDelayMs,
+                int customMaxDelayMs)
+            {
+                MaxPacketsInBuffer = maxPacketsInBuffer;
+                AdditionalDelayMs = additionalDelayMs;
+                JitterBufferMode = jitterBufferMode;
+                CustomMinDelayMs = customMinDelayMs;
+                CustomMaxDelayMs = customMaxDelayMs;
+            }
+
+            public bool Matches(
+                int maxPacketsInBuffer,
+                int additionalDelayMs,
+                OnAudioFilterReadVcConfig.JitterBufferMode jitterBufferMode,
+                int customMinDelayMs,
+                int customMaxDelayMs)
+            {
+                return MaxPacketsInBuffer == maxPacketsInBuffer &&
+                    AdditionalDelayMs == additionalDelayMs &&
+                    JitterBufferMode == jitterBufferMode &&
+                    CustomMinDelayMs == customMinDelayMs &&
+                    CustomMaxDelayMs == customMaxDelayMs;
+            }
+        }
+
+        private readonly struct NetEqConfig : IEquatable<NetEqConfig>
+        {
+            public readonly int PacketDurationMs;
+            public readonly int MaxPacketsInBuffer;
+            public readonly int MaxDelayMs;
+            public readonly int MinDelayMs;
+            public readonly int AdditionalDelayMs;
+
+            public NetEqConfig(
+                int packetDurationMs,
+                int maxPacketsInBuffer,
+                int maxDelayMs,
+                int minDelayMs,
+                int additionalDelayMs)
+            {
+                PacketDurationMs = packetDurationMs;
+                MaxPacketsInBuffer = maxPacketsInBuffer;
+                MaxDelayMs = maxDelayMs;
+                MinDelayMs = minDelayMs;
+                AdditionalDelayMs = additionalDelayMs;
+            }
+
+            public bool Equals(NetEqConfig other)
+            {
+                return PacketDurationMs == other.PacketDurationMs &&
+                    MaxPacketsInBuffer == other.MaxPacketsInBuffer &&
+                    MaxDelayMs == other.MaxDelayMs &&
+                    MinDelayMs == other.MinDelayMs &&
+                    AdditionalDelayMs == other.AdditionalDelayMs;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is NetEqConfig other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(PacketDurationMs, MaxPacketsInBuffer, MaxDelayMs, MinDelayMs, AdditionalDelayMs);
             }
         }
 
