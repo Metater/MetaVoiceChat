@@ -4,8 +4,8 @@
     public enum VcMilliseconds : byte
     {
         Ms20,
-        Ms40,
         Ms10,
+        Ms40,
     }
 
     public static class VcMillisecondsExtensions
