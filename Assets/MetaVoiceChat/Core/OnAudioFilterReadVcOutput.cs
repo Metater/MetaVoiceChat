@@ -808,8 +808,8 @@ namespace MetaVoiceChat.Core
 
             OnAudioFilterReadVcConfig config = audioFilterReadConfig;
             int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
-            int minDelayMs = Math.Max(0, config != null ? (int)config.minDelayMs : DefaultMinDelayMs);
-            int maxDelayMs = Math.Max(minDelayMs, config != null ? (int)config.maxDelayMs : DefaultMaxDelayMs);
+            int minDelayMs = Math.Max(0, config != null ? (int)config.customMinDelayMs : DefaultMinDelayMs);
+            int maxDelayMs = Math.Max(minDelayMs, config != null ? (int)config.customMaxDelayMs : DefaultMaxDelayMs);
             int additionalDelayMs = Math.Max(0, config != null ? (int)config.additionalDelayMs : DefaultAdditionalDelayMs);
 
             Volatile.Write(ref cachedMaxPacketsInBuffer, maxPacketsInBuffer);

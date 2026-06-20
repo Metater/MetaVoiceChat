@@ -27,18 +27,18 @@ namespace MetaVoiceChat.Core
         [Range(0, 200)]
         public uint additionalDelayMs = OnAudioFilterReadVcOutput.DefaultAdditionalDelayMs;
 
-        [Tooltip("")]
+        [Tooltip("Controls NetEQ's adaptive jitter-buffer delay. Low Latency keeps voice more responsive but may glitch more on uneven packet timing. Balanced is recommended for most games. Stable allows more delay to smooth out worse network or frame timing. Custom uses the Max Delay and Min Delay values below.")]
         public JitterBufferMode jitterBufferMode = OnAudioFilterReadVcOutput.DefaultJitterBufferMode;
 
-        [Header("Custom NetEQ Delay Settings")]
+        [Header("Custom NetEQ Delay Settings (Only Used In Custom Mode)")]
 
-        [Tooltip("Maximum adaptive jitter-buffer delay in milliseconds. Lower values feel more responsive; higher values tolerate shakier network timing at the cost of possible added latency.")]
+        [Tooltip("Only used when Jitter Buffer Mode is Custom. Maximum adaptive jitter-buffer delay in milliseconds. Lower values feel more responsive; higher values tolerate shakier network timing at the cost of possible added latency.")]
         [Range(40, 300)]
-        public uint maxDelayMs = OnAudioFilterReadVcOutput.DefaultMaxDelayMs;
+        public uint customMaxDelayMs = OnAudioFilterReadVcOutput.DefaultMaxDelayMs;
 
-        [Tooltip("Minimum adaptive jitter-buffer delay in milliseconds. Higher values can make playback steadier but add baseline latency. Keep this at or below Max Delay; the runtime should clamp Max Delay upward if needed.")]
+        [Tooltip("Only used when Jitter Buffer Mode is Custom. Minimum adaptive jitter-buffer delay in milliseconds. Higher values can make playback steadier but add baseline latency. Keep this at or below Max Delay; the runtime should clamp Max Delay upward if needed.")]
         [Range(0, 100)]
-        public uint minDelayMs = OnAudioFilterReadVcOutput.DefaultMinDelayMs;
+        public uint customMinDelayMs = OnAudioFilterReadVcOutput.DefaultMinDelayMs;
 
         public int ResamplerBufferMs
         {
@@ -62,7 +62,7 @@ namespace MetaVoiceChat.Core
         {
             if (mode == JitterBufferMode.Custom && config != null)
             {
-                return config.maxDelayMs;
+                return config.customMaxDelayMs;
             }
 
             return mode switch
