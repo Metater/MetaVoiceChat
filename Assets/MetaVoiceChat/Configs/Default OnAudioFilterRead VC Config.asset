@@ -15,6 +15,7 @@ MonoBehaviour:
   resamplerQuality: 4
   resamplerBufferMs: 10
   maxPacketsInBuffer: 50
-  maxDelayMs: 150
-  minDelayMs: 20
   additionalDelayMs: 0
+  jitterBufferMode: 0
+  customMinDelayMs: 20
+  customMaxDelayMs: 150

@@ -14,8 +14,6 @@ namespace MetaVoiceChat.Core
     {
         // NetEQ constants
         public const int DefaultMaxPacketsInBuffer = 50;
-        public const int DefaultMaxDelayMs = 150;
-        public const int DefaultMinDelayMs = 20;
         public const int DefaultAdditionalDelayMs = 0;
         public const OnAudioFilterReadVcConfig.JitterBufferMode DefaultJitterBufferMode = OnAudioFilterReadVcConfig.JitterBufferMode.Balanced;
         // Speex resampler constants
@@ -57,12 +55,13 @@ namespace MetaVoiceChat.Core
         private int cachedDspBufferCount;
         private int cachedDspBufferMs;
         private int cachedMaxPacketsInBuffer = DefaultMaxPacketsInBuffer;
-        private int cachedMaxDelayMs = DefaultMaxDelayMs;
-        private int cachedMinDelayMs = DefaultMinDelayMs;
+        private int cachedMaxDelayMs;
+        private int cachedMinDelayMs;
         private int cachedAdditionalDelayMs = DefaultAdditionalDelayMs;
         private int cachedResamplerQuality = DefaultResamplerQuality;
         private int cachedResamplerBufferMs = DefaultResamplerBufferMs;
         private int cachedNetEqConfigHash;
+        private int cachedPacketDurationMs = 20;
 
         private int currentBufferSizeMs;
         private int receiveToInsertLatencyMs;
@@ -175,6 +174,10 @@ namespace MetaVoiceChat.Core
                 pendingFrame.Timestamp = timestamp;
                 pendingFrame.ReceivedTimestamp = Stopwatch.GetTimestamp();
                 pendingFrame.IsSilence = isSilence;
+
+                int samplesPerChannel = frameSize / inputChannels;
+                int packetDurationMs = Math.Max(1, (int)Math.Round(samplesPerChannel * 1000.0 / inputFrequency));
+                Volatile.Write(ref cachedPacketDurationMs, packetDurationMs);
 
                 if (Volatile.Read(ref acceptingFrames) == 0)
                 {
@@ -806,18 +809,32 @@ namespace MetaVoiceChat.Core
                 Volatile.Write(ref recreatePlaybackClipRequested, 1);
             }
 
+            CacheNetEqConfig(Math.Max(1, Volatile.Read(ref cachedPacketDurationMs)));
+
             OnAudioFilterReadVcConfig config = audioFilterReadConfig;
+            Volatile.Write(ref cachedResamplerQuality, Math.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
+            Volatile.Write(ref cachedResamplerBufferMs, Math.Clamp(config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs, 10, 100));
+        }
+
+        private void CacheNetEqConfig(int packetDurationMs)
+        {
+            OnAudioFilterReadVcConfig config = audioFilterReadConfig;
+            OnAudioFilterReadVcConfig.JitterBufferMode jitterBufferMode = config != null
+                ? config.jitterBufferMode
+                : DefaultJitterBufferMode;
             int maxPacketsInBuffer = Math.Max(1, config != null ? config.maxPacketsInBuffer : DefaultMaxPacketsInBuffer);
-            int minDelayMs = Math.Max(0, config != null ? (int)config.customMinDelayMs : DefaultMinDelayMs);
-            int maxDelayMs = Math.Max(minDelayMs, config != null ? (int)config.customMaxDelayMs : DefaultMaxDelayMs);
+            int minDelayMs = Math.Max(
+                0,
+                (int)OnAudioFilterReadVcConfig.GetMinDelayMs(packetDurationMs, jitterBufferMode, config));
+            int maxDelayMs = Math.Max(
+                minDelayMs,
+                (int)OnAudioFilterReadVcConfig.GetMaxDelayMs(packetDurationMs, jitterBufferMode, config));
             int additionalDelayMs = Math.Max(0, config != null ? (int)config.additionalDelayMs : DefaultAdditionalDelayMs);
 
             Volatile.Write(ref cachedMaxPacketsInBuffer, maxPacketsInBuffer);
             Volatile.Write(ref cachedMaxDelayMs, maxDelayMs);
             Volatile.Write(ref cachedMinDelayMs, minDelayMs);
             Volatile.Write(ref cachedAdditionalDelayMs, additionalDelayMs);
-            Volatile.Write(ref cachedResamplerQuality, Math.Clamp(config != null ? config.resamplerQuality : DefaultResamplerQuality, 0, 10));
-            Volatile.Write(ref cachedResamplerBufferMs, Math.Clamp(config != null ? config.ResamplerBufferMs : DefaultResamplerBufferMs, 10, 100));
             Volatile.Write(
                 ref cachedNetEqConfigHash,
                 HashNetEqConfig(
