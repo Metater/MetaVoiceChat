@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core.Editor
+namespace MetaVoiceChat.Core.Editor.RNNoise
 {
     public class MetaVoiceChatEditorWindow : EditorWindow
     {

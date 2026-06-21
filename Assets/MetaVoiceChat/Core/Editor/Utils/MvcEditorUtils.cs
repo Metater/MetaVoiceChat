@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core.Editor
+namespace MetaVoiceChat.Core.Editor.Utils
 {
     public static class MvcEditorUtils
     {

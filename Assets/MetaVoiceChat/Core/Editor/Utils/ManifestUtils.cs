@@ -6,7 +6,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core.Editor
+namespace MetaVoiceChat.Core.Editor.Utils
 {
     /// <summary>
     /// Safely updates Unity's package manifest without relying on a JSON package.
