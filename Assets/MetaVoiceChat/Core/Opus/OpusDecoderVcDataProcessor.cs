@@ -5,8 +5,7 @@ namespace MetaVoiceChat.Core.Opus
 {
     public class OpusDecoderVcDataProcessor : IVcDataProcessor
     {
-        private const int MaxPossibleBufferSize = 48000 * 2 * 40 / 1000;
-        private readonly float[] buffer = new float[MaxPossibleBufferSize];
+        private readonly float[] buffer = new float[MetaVoiceChatConstants.MaxPossibleFrameSizeInSamples];
         private IOpusDecoder decoder;
 
         private int lastSamplesDecoded = 0;
