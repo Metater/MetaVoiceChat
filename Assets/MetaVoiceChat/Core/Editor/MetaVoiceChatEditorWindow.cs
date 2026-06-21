@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace MetaVoiceChat
+namespace MetaVoiceChat.Core.Editor
 {
     public class MetaVoiceChatEditorWindow : EditorWindow
     {

@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MetaVoiceChat
+namespace MetaVoiceChat.Core.Editor
 {
     public static class ManifestUtils
     {
