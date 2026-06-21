@@ -1,14 +1,24 @@
-# References
-- https://github.com/security-union/videocall-rs/tree/main/neteq
-- https://chromium.googlesource.com/external/webrtc/+/master/modules/audio_coding/neteq/g3doc/index.md
-- https://github.com/RubyBit/aec3-rs
-- https://www.forasoft.com/learn/audio-for-video/articles-audio/automatic-gain-control-agc2
-- https://github.com/adrenak/RNNoise4Unity
-- https://github.com/Metater/meta-voice-chat-neteq
-- https://github.com/Metater/meta-voice-chat-aec3
+# Opus Links
+- [Opus Recommended Settings](https://wiki.xiph.org/Opus_Recommended_Settings)
+- [libopus 1.1.2](https://opus-codec.org/docs/opus_api-1.1.2/index.html)
+- [VisioForge Opus](https://www.visioforge.com/help/docs/dotnet/general/audio-encoders/opus)
+- [Concentus: Opus for Everyone](https://github.com/lostromb/concentus)
+
+# RNNoise Links
+- [RNNoise4Unity GitHub](https://github.com/adrenak/RNNoise4Unity)
+- [rnnoise](https://github.com/xiph/rnnoise)
+
+# WebRTC AEC3/AGC2/NetEQ Links
+- [Metater/meta-voice-chat-neteq](https://github.com/Metater/meta-voice-chat-neteq)
+- [Metater/meta-voice-chat-aec3](https://github.com/Metater/meta-voice-chat-aec3)
+- [How WebRTC’s NetEQ Jitter Buffer Provides Smooth Audio](https://webrtchacks.com/how-webrtcs-neteq-jitter-buffer-provides-smooth-audio/)
+- [security-union/videocall-rs/neteq](https://github.com/security-union/videocall-rs/tree/main/neteq)
+- [Google NetEQ](https://chromium.googlesource.com/external/webrtc/+/master/modules/audio_coding/neteq/g3doc/index.md)
+- [RubyBit/aec3-rs](https://github.com/RubyBit/aec3-rs)
+- [Automatic gain control (AGC): keeping voice level consistent](https://www.forasoft.com/learn/audio-for-video/articles-audio/automatic-gain-control-agc2)
+
 
 # To-Do
-- Make OnAudioFilterReadVcOutput NetEQ config based on multiples of frames and make it reconfigure on frame size changes
 - Ensure liscences for mvc-aec3 and mvc-neteq, and Pro are good
 - Add MIT liscence to root project, but exclude Pro
 - Voice recorder and playback system

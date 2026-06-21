@@ -1,15 +1,16 @@
 #if UNITY_EDITOR
+using MetaVoiceChat.Core.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
 namespace MetaVoiceChat.Core.Editor.RNNoise
 {
-    public class MetaVoiceChatEditorWindow : EditorWindow
+    public class InstallRnnoiseWindow : EditorWindow
     {
         [MenuItem("MetaVoiceChat/Install RNNoise")]
         public static void ShowWindow()
         {
-            GetWindow<MetaVoiceChatEditorWindow>("Install RNNoise");
+            GetWindow<InstallRnnoiseWindow>("Install RNNoise");
         }
 
         private void OnGUI()
@@ -26,7 +27,7 @@ namespace MetaVoiceChat.Core.Editor.RNNoise
             {
                 ManifestUtils.AddScopedRegistry("npmjs", "https://registry.npmjs.org", new string[] { "com.npmjs", "com.adrenak.rnnoise4unity" });
                 ManifestUtils.AddDependency("com.adrenak.rnnoise4unity", "1.0.0");
-                MvcEditorUtils.AddDefineSymbol("META_VOICE_CHAT_RNNOISE");
+                DefineSymbolUtils.AddDefineSymbol("META_VOICE_CHAT_RNNOISE");
             }
 
             GUILayout.Label("This will add com.adrenak.rnnoise4unity to your package.json scoped registries and install the package. It will also add META_VOICE_CHAT_RNNOISE to your define symbols.", EditorStyles.wordWrappedLabel);
@@ -35,7 +36,7 @@ namespace MetaVoiceChat.Core.Editor.RNNoise
 
             GUILayout.Label("Step 2 - Restart Unity if there are errors", EditorStyles.boldLabel);
 
-            GUILayout.Label("Restarting Unity might be necessary if Unity doesn't recognize all of the changes.", EditorStyles.wordWrappedLabel);
+            GUILayout.Label("Restarting Unity might be necessary if Unity doesn't recognize all of the changes. Ignore the package not signed warning for new versions of Unity.", EditorStyles.wordWrappedLabel);
 
             EditorGUILayout.Space();
 
@@ -44,7 +45,7 @@ namespace MetaVoiceChat.Core.Editor.RNNoise
 
             EditorGUILayout.Space();
             GUILayout.Label("Step 4 - It will just start working", EditorStyles.boldLabel);
-            GUILayout.Label($"RNNoise can now be used. Place an RNNoise filter in your input pipeline and ensure 48 kHz input.", EditorStyles.wordWrappedLabel);
+            GUILayout.Label($"RNNoise can now be used. Check your voice pipeline settings.", EditorStyles.wordWrappedLabel);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);

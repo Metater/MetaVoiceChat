@@ -1,3 +1,4 @@
+using MetaVoiceChat.Core.Editor.Utils;
 using UnityEditor;
 
 namespace MetaVoiceChat.Core.Editor
@@ -44,6 +45,8 @@ namespace MetaVoiceChat.Core.Editor
             }
 
             serializedObject.ApplyModifiedProperties();
+
+            MetaVoiceChatFooterUtils.DrawFooter();
         }
 
         private static void DrawPresetDelayFields(OnAudioFilterReadVcConfig.JitterBufferMode mode)
