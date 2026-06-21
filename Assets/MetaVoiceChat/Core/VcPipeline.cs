@@ -5,6 +5,6 @@ namespace MetaVoiceChat.Core
 {
     public abstract class VcPipeline : MonoBehaviour, IVcProcessor
     {
-        public abstract void Process(ReadOnlySpan<float> frame, int frameSize, int inputFrequency, int inputChannels, ushort sequenceNumber, uint timestamp);
+        public abstract void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp);
     }
 }

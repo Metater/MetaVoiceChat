@@ -6,7 +6,7 @@ namespace MetaVoiceChat.Core
     {
         public OnAudioFilterReadVcOutput[] outputs;
 
-        public override void Process(ReadOnlySpan<float> frame, int frameSize, int inputFrequency, int inputChannels, ushort sequenceNumber, uint timestamp)
+        public override void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
             if (outputs != null)
             {
@@ -14,7 +14,7 @@ namespace MetaVoiceChat.Core
                 {
                     if (output != null)
                     {
-                        output.Process(frame, frameSize, inputFrequency, inputChannels, sequenceNumber, timestamp);
+                        output.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);
                     }
                 }
             }

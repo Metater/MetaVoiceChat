@@ -122,8 +122,8 @@ namespace MetaVoiceChat.Core
         public void Process(
             ReadOnlySpan<float> frame,
             int frameSize,
-            int inputFrequency,
-            int inputChannels,
+            int frequency,
+            int channels,
             ushort sequenceNumber,
             uint timestamp)
         {
@@ -132,7 +132,7 @@ namespace MetaVoiceChat.Core
 #endif
 
             if (Volatile.Read(ref acceptingFrames) == 0 ||
-                !IsValidFrameShape(frameSize, inputFrequency, inputChannels))
+                !IsValidFrameShape(frameSize, frequency, channels))
             {
 #if LOG_OnAudioFilterReadVcOutput
                 Interlocked.Increment(ref droppedInvalidFrameCount);
@@ -168,14 +168,14 @@ namespace MetaVoiceChat.Core
                 }
 
                 pendingFrame.SampleLength = frameSize;
-                pendingFrame.InputSampleRate = inputFrequency;
-                pendingFrame.InputChannels = inputChannels;
+                pendingFrame.SampleRate = frequency;
+                pendingFrame.Channels = channels;
                 pendingFrame.SequenceNumber = sequenceNumber;
                 pendingFrame.Timestamp = timestamp;
                 pendingFrame.ReceivedTimestamp = Stopwatch.GetTimestamp();
                 pendingFrame.IsSilence = isSilence;
 
-                pendingFrame.NetEqConfig = GetCachedNetEqConfig(frameSize / inputChannels, inputFrequency);
+                pendingFrame.NetEqConfig = GetCachedNetEqConfig(frameSize / channels, frequency);
 
                 if (Volatile.Read(ref acceptingFrames) == 0)
                 {
@@ -410,7 +410,7 @@ namespace MetaVoiceChat.Core
                         continue;
                     }
 
-                    if (!EnsureNetEqFor(frame.InputSampleRate, frame.InputChannels, frame.NetEqConfig))
+                    if (!EnsureNetEqFor(frame.SampleRate, frame.Channels, frame.NetEqConfig))
                     {
                         continue;
                     }
@@ -431,8 +431,8 @@ namespace MetaVoiceChat.Core
                         frame.Timestamp,
                         packetSamples,
                         frame.SampleLength,
-                        frame.InputSampleRate,
-                        frame.InputChannels,
+                        frame.SampleRate,
+                        frame.Channels,
                         frame.NetEqConfig.PacketDurationMs);
 
                     Volatile.Write(
@@ -1048,8 +1048,8 @@ namespace MetaVoiceChat.Core
         {
             public float[] Samples = Array.Empty<float>();
             public int SampleLength;
-            public int InputSampleRate;
-            public int InputChannels;
+            public int SampleRate;
+            public int Channels;
             public ushort SequenceNumber;
             public uint Timestamp;
             public long ReceivedTimestamp;
