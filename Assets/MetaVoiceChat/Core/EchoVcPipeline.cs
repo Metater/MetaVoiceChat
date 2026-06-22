@@ -1,4 +1,5 @@
 using MetaVoiceChat.Core.Opus;
+using MetaVoiceChat.Core.RNNoise;
 using System;
 using UnityEngine;
 
@@ -12,11 +13,15 @@ namespace MetaVoiceChat.Core
 
         public OnAudioFilterReadVcOutput[] outputs;
 
+        private readonly RnnoiseVcProcessor rnnoise = new();
         private readonly OpusEncoderVcProcessor encoder = new(default);
         private readonly OpusDecoderVcDataProcessor decoder = new();
 
         public override void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
+            rnnoise.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);
+            ReadOnlySpan<float> rnnoiseFrame = rnnoise.DenoisedSamples;
+
             var userConfig = encoder.UserConfig;
             OpusUserConfig targetUserConfig = opusUserConfigScriptableObject.ToOpusUserConfig(tempMaxDataBytesPerPacket);
             if (!userConfig.Equals(targetUserConfig))
@@ -24,7 +29,7 @@ namespace MetaVoiceChat.Core
                 encoder.UserConfig = targetUserConfig;
             }
 
-            encoder.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);
+            encoder.Process(rnnoiseFrame, frameSize, frequency, channels, sequenceNumber, timestamp);
             decoder.Process(encoder.EncodedData, frameSize, frequency, channels, sequenceNumber, timestamp);
             ReadOnlySpan<float> testFrame = decoder.DecodedData;
 
