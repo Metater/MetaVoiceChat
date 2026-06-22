@@ -18,7 +18,7 @@ namespace MetaVoiceChat.Core.AEC3
         /// The current microphone input-volume value supplied to AGC2. Unity does not expose a
         /// hardware microphone volume, so the default is the native maximum of 255.
         /// </summary>
-        public int AppliedInputVolume { get; set; } = 255;
+        public int AppliedInputVolume { get; set; } = 127;
 
         /// <summary>
         /// Gain-controlled samples from the most recent <see cref="Process"/> call.

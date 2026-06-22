@@ -769,6 +769,7 @@ MonoBehaviour:
   enableAcousticEchoCancellation: 1
   enableRnnoise: 1
   enableAutomaticGainControl: 1
+  appliedInputVolume: 127
   enableOpus: 1
   outputs:
   - {fileID: 7332652667869805107}
