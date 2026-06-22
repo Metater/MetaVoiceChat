@@ -5,7 +5,6 @@ namespace MetaVoiceChat.Core.Opus
 {
     public readonly struct OpusConfig : IEquatable<OpusConfig>
     {
-        public const int MaxPacketSize = 1275; // Maximum packet size for Opus
         public const int BitsPerSample = 16;
 
         public readonly int sampleRate;

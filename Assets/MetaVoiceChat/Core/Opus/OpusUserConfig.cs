@@ -18,56 +18,52 @@ namespace MetaVoiceChat.Core.Opus
         public readonly int maxDataBytesPerPacket;
         public readonly int complexity;
         public readonly bool isMusic;
-        public readonly bool shouldOverride;
+        public readonly bool shouldOverrideApplication;
         public readonly OpusApplication overrideApplication;
+        public readonly bool shouldOverrideBandwidth;
         public readonly OpusBandwidth overrideBandwidth;
+        public readonly bool shouldOverrideMode;
         public readonly OpusMode overrideMode;
+        public readonly bool shouldOverrideSignal;
         public readonly OpusSignal overrideSignal;
 
-        public OpusMode GetMode(int frequency)
+        public OpusMode GetMode()
         {
-            if (shouldOverride)
+            if (shouldOverrideMode)
             {
                 return overrideMode;
             }
 
-            if (isMusic)
-            {
-                return OpusMode.MODE_CELT_ONLY;
-            }
+            // There might have been a reason for this before, I think it switched to hybrid mode automatically and caused a crash with some config
 
-            if (frequency == 8000 || frequency == 12000)
-            {
-                return OpusMode.MODE_SILK_ONLY;
-            }
+            //if (isMusic)
+            //{
+            //    return OpusMode.MODE_CELT_ONLY;
+            //}
 
-            return OpusMode.MODE_CELT_ONLY;
+            //return OpusMode.MODE_CELT_ONLY;
+
+            return OpusMode.MODE_AUTO;
         }
 
-        public OpusBandwidth GetBandwidth(int frequency)
+        public OpusBandwidth GetBandwidth(int frequency, int channels)
         {
-            if (shouldOverride)
+            if (shouldOverrideBandwidth)
             {
                 return overrideBandwidth;
             }
 
-            // Referenced: https://wiki.xiph.org/Opus_Recommended_Settings
-            // Bandwidth Transition Thresholds
-            // Note the Nyquist frequency is half the sampling rate
-            return frequency switch
-            {
-                8000 => OpusBandwidth.OPUS_BANDWIDTH_NARROWBAND,
-                12000 => OpusBandwidth.OPUS_BANDWIDTH_MEDIUMBAND,
-                16000 => OpusBandwidth.OPUS_BANDWIDTH_WIDEBAND,
-                24000 => OpusBandwidth.OPUS_BANDWIDTH_SUPERWIDEBAND,
-                48000 => OpusBandwidth.OPUS_BANDWIDTH_FULLBAND,
-                _ => OpusBandwidth.OPUS_BANDWIDTH_FULLBAND,
-            };
+            //if (channels > 1)
+            //{
+            //    return OpusBandwidth.OPUS_BANDWIDTH_FULLBAND;
+            //}
+
+            return OpusBandwidth.OPUS_BANDWIDTH_AUTO;
         }
 
         public OpusApplication GetApplication()
         {
-            if (shouldOverride)
+            if (shouldOverrideApplication)
             {
                 return overrideApplication;
             }
@@ -77,12 +73,14 @@ namespace MetaVoiceChat.Core.Opus
 
         public OpusSignal GetSignal()
         {
-            if (shouldOverride)
+            if (shouldOverrideSignal)
             {
                 return overrideSignal;
             }
 
-            return isMusic ? OpusSignal.OPUS_SIGNAL_MUSIC : OpusSignal.OPUS_SIGNAL_VOICE;
+            //return isMusic ? OpusSignal.OPUS_SIGNAL_MUSIC : OpusSignal.OPUS_SIGNAL_VOICE;
+
+            return OpusSignal.OPUS_SIGNAL_AUTO;
         }
 
         public OpusConfig GetConfig(int frequency, int channels)
@@ -91,28 +89,31 @@ namespace MetaVoiceChat.Core.Opus
                 sampleRate: frequency,
                 numChannels: channels,
                 application: GetApplication(),
-                bandwidth: GetBandwidth(frequency),
+                bandwidth: GetBandwidth(frequency, channels),
                 complexity: complexity,
-                mode: GetMode(frequency),
+                mode: GetMode(),
                 signal: GetSignal()
             );
         }
 
-        public OpusUserConfig(int maxDataBytesPerPacket, int complexity, bool isMusic, bool shouldOverride, OpusApplication overrideApplication, OpusBandwidth overrideBandwidth, OpusMode overrideMode, OpusSignal overrideSignal)
+        public OpusUserConfig(int maxDataBytesPerPacket, int complexity, bool isMusic, bool shouldOverrideApplication, OpusApplication overrideApplication, bool shouldOverrideBandwidth, OpusBandwidth overrideBandwidth, bool shouldOverrideMode, OpusMode overrideMode, bool shouldOverrideSignal, OpusSignal overrideSignal)
         {
-            this.maxDataBytesPerPacket = Math.Clamp(maxDataBytesPerPacket, 100, OpusConfig.MaxPacketSize);
+            this.maxDataBytesPerPacket = Math.Clamp(maxDataBytesPerPacket, 100, MetaVoiceChatConstants.MaxPacketSize);
             this.complexity = Math.Clamp(complexity, 0, 10);
             this.isMusic = isMusic;
-            this.shouldOverride = shouldOverride;
+            this.shouldOverrideApplication = shouldOverrideApplication;
             this.overrideApplication = overrideApplication;
+            this.shouldOverrideBandwidth = shouldOverrideBandwidth;
             this.overrideBandwidth = overrideBandwidth;
+            this.shouldOverrideMode = shouldOverrideMode;
             this.overrideMode = overrideMode;
+            this.shouldOverrideSignal = shouldOverrideSignal;
             this.overrideSignal = overrideSignal;
         }
 
         public bool Equals(OpusUserConfig other)
         {
-            return maxDataBytesPerPacket == other.maxDataBytesPerPacket && complexity == other.complexity && isMusic == other.isMusic && shouldOverride == other.shouldOverride && overrideApplication == other.overrideApplication && overrideBandwidth == other.overrideBandwidth && overrideMode == other.overrideMode && overrideSignal == other.overrideSignal;
+            return maxDataBytesPerPacket == other.maxDataBytesPerPacket && complexity == other.complexity && isMusic == other.isMusic && shouldOverrideApplication == other.shouldOverrideApplication && overrideApplication == other.overrideApplication && shouldOverrideBandwidth == other.shouldOverrideBandwidth && overrideBandwidth == other.overrideBandwidth && shouldOverrideMode == other.shouldOverrideMode && overrideMode == other.overrideMode && shouldOverrideSignal == other.shouldOverrideSignal && overrideSignal == other.overrideSignal;
         }
 
         public override bool Equals(object obj)
@@ -122,7 +123,13 @@ namespace MetaVoiceChat.Core.Opus
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(maxDataBytesPerPacket, complexity, isMusic, shouldOverride, overrideApplication, overrideBandwidth, overrideMode, overrideSignal);
+            int overrideBooleans = 0;
+            overrideBooleans |= (shouldOverrideApplication ? 1 : 0) << 0;
+            overrideBooleans |= (shouldOverrideBandwidth ? 1 : 0) << 1;
+            overrideBooleans |= (shouldOverrideMode ? 1 : 0) << 2;
+            overrideBooleans |= (shouldOverrideSignal ? 1 : 0) << 3;
+
+            return HashCode.Combine(maxDataBytesPerPacket, complexity, isMusic, overrideApplication, overrideBandwidth, overrideMode, overrideSignal, overrideBooleans);
         }
     }
 }

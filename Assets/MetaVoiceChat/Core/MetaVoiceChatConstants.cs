@@ -7,5 +7,7 @@
 
         // 48 kHz, 1 channel, 40 ms frame size
         public const int MaxPossibleFrameSizeInSamplesMono = 48000 * 1 * 40 / 1000;
+
+        public const int MaxPacketSize = 1275; // Maximum packet size for Opus
     }
 }

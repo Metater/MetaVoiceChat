@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d2fc2325f6452d419f21f963c774e77, type: 3}
+  m_Name: Music Opus Encoder Config
+  m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.Opus.OpusEncoderConfigScriptableObject
+  application: 2049
+  complexity: 3
+  overrideSignalType: 1
+  signalType: 3002
+  overrideMaxBandwidth: 0
+  maxBandwidth: -1000
+  overrideForceMode: 0
+  forceMode: 1002
+  overrideBandwidth: 0
+  bandwidth: -1000
+  overrideLSBDepth: 1
+  lsbDepth: 16
+  overrideForceChannels: 0
+  forceChannels: -1000
+  overrideBitrate: 0
+  bitrate: -1000
+  overrideUseDTX: 0
+  useDTX: 0
+  overrideUseInbandFEC: 0
+  useInbandFEC: 0
+  overridePacketLossPercent: 0
+  packetLossPercent: 0
+  overrideUseVBR: 0
+  useVBR: 1
+  overrideUseConstrainedVBR: 0
+  useConstrainedVBR: 1
+  overrideExpertFrameDuration: 0
+  expertFrameDuration: 5000
+  overridePredictionDisabled: 0
+  predictionDisabled: 0
