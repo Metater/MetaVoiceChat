@@ -1,7 +1,9 @@
 {
     "name": "MetaVoiceChat.Core",
     "rootNamespace": "MetaVoiceChat.Core",
-    "references": [],
+    "references": [
+        "GUID:4653938bfdb5cf8409322ce17219d5f7"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,
