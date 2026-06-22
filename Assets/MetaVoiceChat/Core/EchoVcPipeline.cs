@@ -1,3 +1,4 @@
+using MetaVoiceChat.Core.NetEQ;
 using MetaVoiceChat.Core.Opus;
 using MetaVoiceChat.Core.RNNoise;
 using System;
