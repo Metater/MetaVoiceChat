@@ -18,11 +18,11 @@ namespace MetaVoiceChat.Core
         public override void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
             var userConfig = encoder.UserConfig;
-            //OpusUserConfig targetUserConfig = new(maxDataBytesPerPacket, complexity, isMusic, shouldOverride, overrideApplication, overrideBandwidth, overrideMode, overrideSignal);
-            //if (!userConfig.Equals(targetUserConfig))
-            //{
-            //    encoder.UserConfig = targetUserConfig;
-            //}
+            OpusUserConfig targetUserConfig = opusUserConfigScriptableObject.ToOpusUserConfig(tempMaxDataBytesPerPacket);
+            if (!userConfig.Equals(targetUserConfig))
+            {
+                encoder.UserConfig = targetUserConfig;
+            }
 
             encoder.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);
             decoder.Process(encoder.EncodedData, frameSize, frequency, channels, sequenceNumber, timestamp);

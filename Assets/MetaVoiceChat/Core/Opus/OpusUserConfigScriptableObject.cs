@@ -102,5 +102,41 @@ namespace MetaVoiceChat.Core.Opus
 
         [Tooltip("Disables prediction in the SILK codec.")]
         public bool predictionDisabled;
+
+        public OpusUserConfig ToOpusUserConfig(int maxDataBytesPerPacket)
+        {
+            return new OpusUserConfig(
+                maxDataBytesPerPacket,
+                application,
+                complexity,
+                overrideSignalType,
+                signalType,
+                overrideMaxBandwidth,
+                maxBandwidth,
+                overrideForceMode,
+                forceMode,
+                overrideBandwidth,
+                bandwidth,
+                overrideLSBDepth,
+                lsbDepth,
+                overrideForceChannels,
+                forceChannels,
+                overrideBitrate,
+                bitrate,
+                overrideUseDTX,
+                useDTX,
+                overrideUseInbandFEC,
+                useInbandFEC,
+                overridePacketLossPercent,
+                packetLossPercent,
+                overrideUseVBR,
+                useVBR,
+                overrideUseConstrainedVBR,
+                useConstrainedVBR,
+                overrideExpertFrameDuration,
+                expertFrameDuration,
+                overridePredictionDisabled,
+                predictionDisabled);
+        }
     }
 }

@@ -763,15 +763,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 242cbf1cacbdf1446ac53aecc163263b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.EchoVcPipeline
-  maxDataBytesPerPacket: 1275
-  complexity: 3
-  isMusic: 0
-  shouldOverride: 0
-  overrideApplication: 2048
-  overrideBandwidth: -1000
-  overrideMode: -1000
-  overrideSignal: -1000
-  outputs: []
+  tempMaxDataBytesPerPacket: 1275
+  opusUserConfigScriptableObject: {fileID: 11400000, guid: 1e8a5f5b0b74fcc4f833519399ec28f6, type: 2}
+  outputs:
+  - {fileID: 7332652667869805107}
 --- !u!114 &7332652667869805107
 MonoBehaviour:
   m_ObjectHideFlags: 0
