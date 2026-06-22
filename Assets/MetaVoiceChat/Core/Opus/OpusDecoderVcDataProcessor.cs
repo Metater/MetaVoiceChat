@@ -3,10 +3,12 @@ using System;
 
 namespace MetaVoiceChat.Core.Opus
 {
-    public class OpusDecoderVcDataProcessor : IVcDataProcessor
+    public class OpusDecoderVcDataProcessor : IVcDataProcessor, IDisposable
     {
         private readonly float[] buffer = new float[MetaVoiceChatConstants.MaxPossibleFrameSizeInSamples];
         private IOpusDecoder decoder;
+
+        private bool disposed = false;
 
         private int lastSamplesDecoded = 0;
         public ReadOnlySpan<float> DecodedData => buffer.AsSpan(0, lastSamplesDecoded);
@@ -20,6 +22,11 @@ namespace MetaVoiceChat.Core.Opus
 
         public void Process(ReadOnlySpan<byte> data, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(OpusDecoderVcDataProcessor));
+            }
+
             if (data.Length == 0)
             {
                 lastSamplesDecoded = frameSize;
@@ -35,6 +42,19 @@ namespace MetaVoiceChat.Core.Opus
 
             int samplesDecoded = decoder.Decode(data, buffer, buffer.Length / channels);
             lastSamplesDecoded = samplesDecoded * channels;
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+
+            decoder?.Dispose();
+            decoder = null;
         }
     }
 }

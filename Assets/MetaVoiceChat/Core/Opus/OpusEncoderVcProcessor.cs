@@ -34,7 +34,7 @@ using System.Threading;
 
 namespace MetaVoiceChat.Core.Opus
 {
-    public class OpusEncoderVcProcessor : IVcProcessor
+    public class OpusEncoderVcProcessor : IVcProcessor, IDisposable
     {
         private readonly byte[] buffer = new byte[MetaVoiceChatConstants.MaxPacketSize];
 
@@ -48,6 +48,8 @@ namespace MetaVoiceChat.Core.Opus
 
         private IOpusEncoder encoder;
         private OpusConfig config;
+
+        private bool disposed = false;
 
         public OpusEncoderVcProcessor(OpusUserConfig userConfig)
         {
@@ -63,6 +65,11 @@ namespace MetaVoiceChat.Core.Opus
 
         public void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(OpusEncoderVcProcessor));
+            }
+
             OpusUserConfig currentUserConfig = UserConfig;
             OpusConfig targetConfig = currentUserConfig.GetConfig(frequency, channels);
 
@@ -153,6 +160,19 @@ namespace MetaVoiceChat.Core.Opus
             }
 
             lastBytesEncoded = encoder.Encode(frame, frameSize / channels, buffer, currentUserConfig.maxDataBytesPerPacket);
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+
+            encoder?.Dispose();
+            encoder = null;
         }
     }
 }

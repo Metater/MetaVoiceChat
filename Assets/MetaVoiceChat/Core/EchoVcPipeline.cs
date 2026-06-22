@@ -17,6 +17,13 @@ namespace MetaVoiceChat.Core
         private readonly OpusEncoderVcProcessor encoder = new(default);
         private readonly OpusDecoderVcDataProcessor decoder = new();
 
+        private void OnDestroy()
+        {
+            rnnoise.Dispose();
+            encoder.Dispose();
+            decoder.Dispose();
+        }
+
         public override void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
             rnnoise.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);

@@ -4,9 +4,9 @@ using System.Runtime.InteropServices;
 namespace MetaVoiceChat.Core.RNNoise
 {
 #if META_VOICE_CHAT_RNNOISE
-    using Adrenak.RNNoise4Unity;
+    using Native = Adrenak.RNNoise4Unity.Native;
 
-    public sealed class RnnoiseVcProcessor : IVcProcessor
+    public sealed class RnnoiseVcProcessor : IVcProcessor, IDisposable
     {
         private const int SupportedFrequencyHz = 48000;
 
@@ -14,8 +14,8 @@ namespace MetaVoiceChat.Core.RNNoise
         private readonly float[] leftChannel = new float[Native.FRAME_SIZE];
         private readonly float[] rightChannel = new float[Native.FRAME_SIZE];
 
-        private DenoiserSafeHandle leftDenoiser;
-        private DenoiserSafeHandle rightDenoiser;
+        private Denoiser leftDenoiser;
+        private Denoiser rightDenoiser;
         private int lastSamplesDenoised;
 
         /// <summary>
@@ -37,7 +37,7 @@ namespace MetaVoiceChat.Core.RNNoise
             if (frame.IsEmpty)
             {
                 lastSamplesDenoised = frameSize;
-                Array.Clear(denoisedSamples, 0, frameSize);
+                Array.Clear(denoisedSamples, 0, denoisedSamples.Length);
                 return;
             }
 
@@ -56,12 +56,12 @@ namespace MetaVoiceChat.Core.RNNoise
 
             if (leftDenoiser == null)
             {
-                leftDenoiser = new DenoiserSafeHandle(new Denoiser());
+                leftDenoiser = new Denoiser();
             }
 
             if (channels == 2 && rightDenoiser == null)
             {
-                rightDenoiser = new DenoiserSafeHandle(new Denoiser());
+                rightDenoiser = new Denoiser();
             }
             else if (channels == 1 && rightDenoiser != null)
             {
@@ -74,20 +74,16 @@ namespace MetaVoiceChat.Core.RNNoise
 
             if (channels == 1)
             {
-                Denoiser left = leftDenoiser.Denoiser;
                 for (int i = 0; i < denoiserFrames; i++)
                 {
                     int sampleOffset = i * Native.FRAME_SIZE;
                     Array.Copy(denoisedSamples, sampleOffset, leftChannel, 0, Native.FRAME_SIZE);
-                    left.Denoise(leftChannel);
+                    leftDenoiser.Denoise(leftChannel);
                     Array.Copy(leftChannel, 0, denoisedSamples, sampleOffset, Native.FRAME_SIZE);
                 }
             }
             else
             {
-                Denoiser left = leftDenoiser.Denoiser;
-                Denoiser right = rightDenoiser.Denoiser;
-
                 for (int i = 0; i < denoiserFrames; i++)
                 {
                     int frameOffset = i * Native.FRAME_SIZE * 2;
@@ -99,8 +95,8 @@ namespace MetaVoiceChat.Core.RNNoise
                         rightChannel[j] = denoisedSamples[interleavedIndex + 1];
                     }
 
-                    left.Denoise(leftChannel);
-                    right.Denoise(rightChannel);
+                    leftDenoiser.Denoise(leftChannel);
+                    rightDenoiser.Denoise(rightChannel);
 
                     for (int j = 0; j < Native.FRAME_SIZE; j++)
                     {
@@ -145,70 +141,92 @@ namespace MetaVoiceChat.Core.RNNoise
             }
         }
 
-        private sealed class DenoiserSafeHandle : SafeHandle
+        public void Dispose()
         {
-            private GCHandle gcHandle;
+            leftDenoiser?.Dispose();
+            leftDenoiser = null;
+            rightDenoiser?.Dispose();
+            rightDenoiser = null;
+        }
 
-            public DenoiserSafeHandle(Denoiser denoiser)
+        private sealed class Denoiser : SafeHandle
+        {
+            public Denoiser()
                 : base(IntPtr.Zero, ownsHandle: true)
             {
-                if (denoiser == null)
+                SetHandle(Native.rnnoise_create(IntPtr.Zero));
+                if (IsInvalid)
                 {
-                    throw new ArgumentNullException(nameof(denoiser));
-                }
-
-                gcHandle = GCHandle.Alloc(denoiser, GCHandleType.Normal);
-                SetHandle(GCHandle.ToIntPtr(gcHandle));
-            }
-
-            public Denoiser Denoiser
-            {
-                get
-                {
-                    if (IsClosed || IsInvalid || !gcHandle.IsAllocated)
-                    {
-                        throw new ObjectDisposedException(nameof(DenoiserSafeHandle));
-                    }
-
-                    if (gcHandle.Target is not Denoiser denoiser)
-                    {
-                        throw new ObjectDisposedException(nameof(DenoiserSafeHandle));
-                    }
-
-                    return denoiser;
+                    throw new InvalidOperationException("Failed to create RNNoise denoiser state.");
                 }
             }
 
             public override bool IsInvalid => handle == IntPtr.Zero;
 
-            protected override bool ReleaseHandle()
+            public unsafe int Denoise(Span<float> buffer, bool finish = false)
             {
+                if (buffer.Length == 0)
+                {
+                    return 0;
+                }
+
+                if (buffer.Length != Native.FRAME_SIZE)
+                {
+                    throw new ArgumentException($"RNNoise denoiser requires exactly {Native.FRAME_SIZE} samples.");
+                }
+
+                if (IsClosed || IsInvalid)
+                {
+                    throw new ObjectDisposedException(nameof(Denoiser));
+                }
+
+                bool addedRef = false;
                 try
                 {
-                    if (gcHandle.IsAllocated && gcHandle.Target is Denoiser denoiser)
+                    DangerousAddRef(ref addedRef);
+
+                    fixed (float* data = buffer)
                     {
-                        try
+                        for (int i = 0; i < Native.FRAME_SIZE; i++)
                         {
-                            denoiser.Dispose();
+                            data[i] *= 32767f;
                         }
-                        catch
+
+                        Native.rnnoise_process_frame(handle, data, data);
+
+                        for (int i = 0; i < Native.FRAME_SIZE; i++)
                         {
-                            // ReleaseHandle may run on the finalizer thread.
-                            // Do not allow cleanup exceptions to escape.
+                            data[i] *= 3.051851E-05f;
                         }
                     }
+
+                    _ = finish;
+                    return Native.FRAME_SIZE;
                 }
                 finally
                 {
-                    if (gcHandle.IsAllocated)
+                    if (addedRef)
                     {
-                        gcHandle.Free();
+                        DangerousRelease();
                     }
+                }
+            }
 
-                    gcHandle = default;
-                    handle = IntPtr.Zero;
+            protected override bool ReleaseHandle()
+            {
+                if (!IsInvalid)
+                {
+                    try
+                    {
+                        Native.rnnoise_destroy(handle);
+                    }
+                    catch
+                    {
+                        // Finalizer thread cleanup should not throw.
+                    }
                 }
 
+                SetHandleAsInvalid();
                 return true;
             }
         }
@@ -236,7 +254,7 @@ namespace MetaVoiceChat.Core.RNNoise
             if (frame.IsEmpty)
             {
                 lastSamplesDenoised = frameSize;
-                Array.Clear(denoisedSamples, 0, frameSize);
+                Array.Clear(denoisedSamples, 0, denoisedSamples.Length);
                 return;
             }
 
