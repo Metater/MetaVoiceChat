@@ -844,7 +844,9 @@ namespace MetaVoiceChat.Core
 
         private static int GetPositiveResult(int result)
         {
-            ThrowIfError(result);
+            // Frame-size exports return a positive sample count on success, unlike
+            // the status-returning exports handled by ThrowIfError.
+            if (result < StatusOk) ThrowIfError(result);
             if (result <= 0) throw new InvalidOperationException("Native AEC3 returned a non-positive frame size.");
             return result;
         }
