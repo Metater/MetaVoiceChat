@@ -14,6 +14,7 @@ namespace MetaVoiceChat.Core.RNNoise
         private readonly float[] leftChannel = new float[Native.FRAME_SIZE];
         private readonly float[] rightChannel = new float[Native.FRAME_SIZE];
 
+        private bool disposed;
         private Denoiser leftDenoiser;
         private Denoiser rightDenoiser;
         private int lastSamplesDenoised;
@@ -26,6 +27,11 @@ namespace MetaVoiceChat.Core.RNNoise
 
         public void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(RnnoiseVcProcessor));
+            }
+
             _ = sequenceNumber;
             _ = timestamp;
 
@@ -37,22 +43,13 @@ namespace MetaVoiceChat.Core.RNNoise
             if (frame.IsEmpty)
             {
                 lastSamplesDenoised = frameSize;
-                Array.Clear(denoisedSamples, 0, denoisedSamples.Length);
+                Array.Clear(denoisedSamples, 0, frameSize);
                 return;
             }
 
             ValidateFrame(frame, frameSize, frequency, channels);
 
-            if (frameSize > denoisedSamples.Length)
-            {
-                throw new ArgumentException($"{nameof(RnnoiseVcProcessor)} frame is larger than the maximum supported buffer size.");
-            }
-
             frame.Slice(0, frameSize).CopyTo(denoisedSamples);
-            if (frame.Length < frameSize)
-            {
-                Array.Clear(denoisedSamples, frame.Length, frameSize - frame.Length);
-            }
 
             if (leftDenoiser == null)
             {
@@ -143,8 +140,16 @@ namespace MetaVoiceChat.Core.RNNoise
 
         public void Dispose()
         {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+
             leftDenoiser?.Dispose();
             leftDenoiser = null;
+
             rightDenoiser?.Dispose();
             rightDenoiser = null;
         }
@@ -214,11 +219,13 @@ namespace MetaVoiceChat.Core.RNNoise
 
             protected override bool ReleaseHandle()
             {
-                if (!IsInvalid)
+                IntPtr handleToRelease = handle;
+
+                if (handleToRelease != IntPtr.Zero)
                 {
                     try
                     {
-                        Native.rnnoise_destroy(handle);
+                        Native.rnnoise_destroy(handleToRelease);
                     }
                     catch
                     {
@@ -226,13 +233,13 @@ namespace MetaVoiceChat.Core.RNNoise
                     }
                 }
 
-                SetHandleAsInvalid();
+                handle = IntPtr.Zero;
                 return true;
             }
         }
     }
 #else
-    public sealed class RnnoiseVcProcessor : IVcProcessor
+    public sealed class RnnoiseVcProcessor : IVcProcessor, IDisposable
     {
         private readonly float[] denoisedSamples = new float[MetaVoiceChatConstants.MaxPossibleFrameSizeInSamples];
         private int lastSamplesDenoised;
@@ -254,17 +261,23 @@ namespace MetaVoiceChat.Core.RNNoise
             if (frame.IsEmpty)
             {
                 lastSamplesDenoised = frameSize;
-                Array.Clear(denoisedSamples, 0, denoisedSamples.Length);
+                Array.Clear(denoisedSamples, 0, frameSize);
                 return;
             }
 
-            frame.Slice(0, frameSize).CopyTo(denoisedSamples);
-            if (frame.Length < frameSize)
+            int copyCount = Math.Min(frame.Length, frameSize);
+            frame.Slice(0, copyCount).CopyTo(denoisedSamples);
+
+            if (copyCount < frameSize)
             {
-                Array.Clear(denoisedSamples, frame.Length, frameSize - frame.Length);
+                Array.Clear(denoisedSamples, copyCount, frameSize - copyCount);
             }
 
             lastSamplesDenoised = frameSize;
+        }
+
+        public void Dispose()
+        {
         }
     }
 #endif
