@@ -51,7 +51,7 @@ namespace MetaVoiceChat.Core.Opus
 
         public OpusEncoderVcProcessor(OpusUserConfig userConfig)
         {
-            this.userConfig = new(userConfig);
+            Volatile.Write(ref this.userConfig, new(userConfig));
 
 #if ENABLE_IL2CPP
             OpusCodecFactory.AttemptToUseNativeLibrary = false;
