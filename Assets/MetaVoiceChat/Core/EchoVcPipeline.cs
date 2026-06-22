@@ -13,6 +13,26 @@ namespace MetaVoiceChat.Core
         public int tempMaxDataBytesPerPacket = MetaVoiceChatConstants.MaxPacketSize;
         public OpusUserConfigScriptableObject opusUserConfigScriptableObject;
 
+        [Header("Processing Stages")]
+        [Tooltip("Apply high-pass filtering before the other audio processing stages.")]
+        public bool enableHighPassFilter = true;
+
+        [Tooltip("Apply acoustic echo cancellation.")]
+        public bool enableAcousticEchoCancellation = true;
+
+        [Tooltip("Apply RNNoise denoising.")]
+        public bool enableRnnoise = true;
+
+        [Tooltip("Apply automatic gain control.")]
+        public bool enableAutomaticGainControl = true;
+
+        [Tooltip("Microphone input volume supplied to AGC2.")]
+        [Range(0, 255)]
+        public int appliedInputVolume = 255;
+
+        [Tooltip("Encode and decode audio through Opus before sending it to outputs.")]
+        public bool enableOpus = true;
+
         public OnAudioFilterReadVcOutput[] outputs;
 
         private readonly AcousticEchoCancellation3VcProcessor aec3 = new();
@@ -31,20 +51,46 @@ namespace MetaVoiceChat.Core
 
         public override void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
-            var userConfig = encoder.UserConfig;
-            OpusUserConfig targetUserConfig = opusUserConfigScriptableObject.ToOpusUserConfig(tempMaxDataBytesPerPacket);
-            if (!userConfig.Equals(targetUserConfig))
+            ReadOnlySpan<float> processedSamples = frame;
+
+            if (enableHighPassFilter)
             {
-                encoder.UserConfig = targetUserConfig;
+                hpf.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+                processedSamples = hpf.HighPassFilteredSamples;
             }
 
-            hpf.Process(frame, frameSize, frequency, channels, sequenceNumber, timestamp);
-            aec3.Process(hpf.HighPassFilteredSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
-            rnnoise.Process(aec3.EchoCancelledSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
-            agc2.Process(rnnoise.DenoisedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+            if (enableAcousticEchoCancellation)
+            {
+                aec3.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+                processedSamples = aec3.EchoCancelledSamples;
+            }
 
-            encoder.Process(agc2.ProcessedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
-            decoder.Process(encoder.EncodedData, frameSize, frequency, channels, sequenceNumber, timestamp);
+            if (enableRnnoise)
+            {
+                rnnoise.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+                processedSamples = rnnoise.DenoisedSamples;
+            }
+
+            if (enableAutomaticGainControl)
+            {
+                agc2.AppliedInputVolume = appliedInputVolume;
+                agc2.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+                processedSamples = agc2.ProcessedSamples;
+            }
+
+            if (enableOpus)
+            {
+                var userConfig = encoder.UserConfig;
+                OpusUserConfig targetUserConfig = opusUserConfigScriptableObject.ToOpusUserConfig(tempMaxDataBytesPerPacket);
+                if (!userConfig.Equals(targetUserConfig))
+                {
+                    encoder.UserConfig = targetUserConfig;
+                }
+
+                encoder.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
+                decoder.Process(encoder.EncodedData, frameSize, frequency, channels, sequenceNumber, timestamp);
+                processedSamples = decoder.DecodedData;
+            }
 
             if (outputs != null)
             {
@@ -52,7 +98,7 @@ namespace MetaVoiceChat.Core
                 {
                     if (output != null)
                     {
-                        output.Process(decoder.DecodedData, frameSize, frequency, channels, sequenceNumber, timestamp);
+                        output.Process(processedSamples, frameSize, frequency, channels, sequenceNumber, timestamp);
                     }
                 }
             }

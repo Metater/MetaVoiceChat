@@ -765,6 +765,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: MetaVoiceChat.Core::MetaVoiceChat.Core.EchoVcPipeline
   tempMaxDataBytesPerPacket: 1275
   opusUserConfigScriptableObject: {fileID: 11400000, guid: 1e8a5f5b0b74fcc4f833519399ec28f6, type: 2}
+  enableHighPassFilter: 1
+  enableAcousticEchoCancellation: 1
+  enableRnnoise: 1
+  enableAutomaticGainControl: 1
+  enableOpus: 1
   outputs:
   - {fileID: 7332652667869805107}
 --- !u!114 &7332652667869805107
@@ -795,7 +800,7 @@ MonoBehaviour:
   vcPipeline: {fileID: 6835464071420841916}
   micVcConfig: {fileID: 11400000, guid: 951f1909053e12243ab920db0bfa2143, type: 2}
   vcFrequency: 0
-  vcMilliseconds: 0
+  vcMilliseconds: 1
   selectedDevice: 
   onActiveDeviceChanged:
     m_PersistentCalls:
