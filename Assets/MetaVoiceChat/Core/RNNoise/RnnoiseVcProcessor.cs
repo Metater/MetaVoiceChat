@@ -4,6 +4,8 @@ namespace MetaVoiceChat.Core.RNNoise
 {
     public class RnnoiseVcProcessor : IVcProcessor
     {
+        private readonly float[] buffer = new float[MetaVoiceChatConstants.MaxPossibleFrameSizeInSamples];
+
         public void Process(ReadOnlySpan<float> frame, int frameSize, int frequency, int channels, ushort sequenceNumber, uint timestamp)
         {
             if (frameSize != 10 && frameSize != 20 && frameSize != 40)
