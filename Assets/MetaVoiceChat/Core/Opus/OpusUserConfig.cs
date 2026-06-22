@@ -34,15 +34,6 @@ namespace MetaVoiceChat.Core.Opus
                 return overrideMode;
             }
 
-            // There might have been a reason for this before, I think it switched to hybrid mode automatically and caused a crash with some config
-
-            //if (isMusic)
-            //{
-            //    return OpusMode.MODE_CELT_ONLY;
-            //}
-
-            //return OpusMode.MODE_CELT_ONLY;
-
             return OpusMode.MODE_AUTO;
         }
 
@@ -52,11 +43,6 @@ namespace MetaVoiceChat.Core.Opus
             {
                 return overrideBandwidth;
             }
-
-            //if (channels > 1)
-            //{
-            //    return OpusBandwidth.OPUS_BANDWIDTH_FULLBAND;
-            //}
 
             return OpusBandwidth.OPUS_BANDWIDTH_AUTO;
         }
@@ -77,8 +63,6 @@ namespace MetaVoiceChat.Core.Opus
             {
                 return overrideSignal;
             }
-
-            //return isMusic ? OpusSignal.OPUS_SIGNAL_MUSIC : OpusSignal.OPUS_SIGNAL_VOICE;
 
             return OpusSignal.OPUS_SIGNAL_AUTO;
         }
