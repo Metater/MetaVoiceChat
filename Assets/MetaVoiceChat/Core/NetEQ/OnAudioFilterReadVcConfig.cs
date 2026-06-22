@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core
+namespace MetaVoiceChat.Core.NetEQ
 {
     [CreateAssetMenu(fileName = "New OnAudioFilterRead VC Config", menuName = "MetaVoiceChat/OnAudioFilterReadVcConfig", order = 3)]
     public class OnAudioFilterReadVcConfig : ScriptableObject

@@ -7,7 +7,7 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-namespace MetaVoiceChat.Core
+namespace MetaVoiceChat.Core.NetEQ
 {
     [RequireComponent(typeof(AudioSource))]
     public sealed class OnAudioFilterReadVcOutput : MonoBehaviour, IVcProcessor

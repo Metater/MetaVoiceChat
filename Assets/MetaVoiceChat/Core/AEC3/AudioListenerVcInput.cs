@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core
+namespace MetaVoiceChat.Core.AEC3
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioListener))]

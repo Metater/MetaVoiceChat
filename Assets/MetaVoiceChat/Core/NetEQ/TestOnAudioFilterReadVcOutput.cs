@@ -3,7 +3,7 @@
 using System;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core
+namespace MetaVoiceChat.Core.NetEQ
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(OnAudioFilterReadVcOutput))]

@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace MetaVoiceChat.Core
+namespace MetaVoiceChat.Core.NetEQ
 {
     /// <summary>
     /// Managed wrapper around the native MetaVoiceChat NetEQ library.

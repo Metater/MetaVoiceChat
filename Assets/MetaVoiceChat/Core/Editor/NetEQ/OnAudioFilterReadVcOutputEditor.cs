@@ -1,7 +1,8 @@
+using MetaVoiceChat.Core.NetEQ;
 using UnityEditor;
 using UnityEngine;
 
-namespace MetaVoiceChat.Core.Editor
+namespace MetaVoiceChat.Core.Editor.NetEQ
 {
     [CustomEditor(typeof(OnAudioFilterReadVcOutput))]
     [CanEditMultipleObjects]
