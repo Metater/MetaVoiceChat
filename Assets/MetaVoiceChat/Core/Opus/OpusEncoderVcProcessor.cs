@@ -77,22 +77,77 @@ namespace MetaVoiceChat.Core.Opus
                 encoder?.Dispose();
                 encoder = OpusCodecFactory.CreateEncoder(targetConfig.sampleRate, targetConfig.numChannels, targetConfig.application);
 
-                encoder.Bandwidth = targetConfig.bandwidth;
-                //encoder.Bitrate
                 encoder.Complexity = targetConfig.complexity;
-                //encoder.ExpertFrameDuration
-                //encoder.FinalRange
-                //encoder.ForceChannels
-                encoder.ForceMode = targetConfig.mode;
-                encoder.LSBDepth = OpusConfig.BitsPerSample;
-                encoder.MaxBandwidth = targetConfig.bandwidth;
-                //encoder.PacketLossPercent
-                //encoder.PredictionDisabled
-                encoder.SignalType = targetConfig.signal;
-                //encoder.UseConstrainedVBR
-                //encoder.UseDTX // Hey future me, I tried this. all it did was throw exceptions in SILK and Hybrid modes.
-                //encoder.UseInbandFEC
-                //encoder.UseVBR
+
+                if (targetConfig.overrideBandwidth)
+                {
+                    encoder.Bandwidth = targetConfig.bandwidth;
+                }
+
+                if (targetConfig.overrideBitrate)
+                {
+                    encoder.Bitrate = targetConfig.bitrate;
+                }
+
+                if (targetConfig.overrideExpertFrameDuration)
+                {
+                    encoder.ExpertFrameDuration = targetConfig.expertFrameDuration;
+                }
+
+                if (targetConfig.overrideForceChannels)
+                {
+                    encoder.ForceChannels = targetConfig.forceChannels;
+                }
+
+                if (targetConfig.overrideForceMode)
+                {
+                    encoder.ForceMode = targetConfig.forceMode;
+                }
+
+                if (targetConfig.overrideLSBDepth)
+                {
+                    encoder.LSBDepth = targetConfig.lsbDepth;
+                }
+
+                if (targetConfig.overrideMaxBandwidth)
+                {
+                    encoder.MaxBandwidth = targetConfig.maxBandwidth;
+                }
+
+                if (targetConfig.overridePacketLossPercent)
+                {
+                    encoder.PacketLossPercent = targetConfig.packetLossPercent;
+                }
+
+                if (targetConfig.overridePredictionDisabled)
+                {
+                    encoder.PredictionDisabled = targetConfig.predictionDisabled;
+                }
+
+                if (targetConfig.overrideSignalType)
+                {
+                    encoder.SignalType = targetConfig.signalType;
+                }
+
+                if (targetConfig.overrideUseConstrainedVBR)
+                {
+                    encoder.UseConstrainedVBR = targetConfig.useConstrainedVBR;
+                }
+
+                if (targetConfig.overrideUseDTX)
+                {
+                    encoder.UseDTX = targetConfig.useDTX;
+                }
+
+                if (targetConfig.overrideUseInbandFEC)
+                {
+                    encoder.UseInbandFEC = targetConfig.useInbandFEC;
+                }
+
+                if (targetConfig.overrideUseVBR)
+                {
+                    encoder.UseVBR = targetConfig.useVBR;
+                }
 
                 config = targetConfig;
             }
