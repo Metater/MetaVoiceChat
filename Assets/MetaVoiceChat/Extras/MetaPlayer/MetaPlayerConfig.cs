@@ -31,7 +31,9 @@ namespace Metater
         public float lookSensitivity = 1;
         public float lookBottomClamp = -90;
         public float lookTopClamp = 90;
-        public bool yInverted = false;
+        public bool yInverted = true;
+        public float xScale = 0.05f;
+        public float yScale = 0.05f;
 
         [Header("Timers")]
         public float timeBetweenJumps = 0.3f;

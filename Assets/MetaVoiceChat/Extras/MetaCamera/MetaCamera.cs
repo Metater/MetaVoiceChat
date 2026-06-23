@@ -12,9 +12,10 @@ namespace Metater
         public CinemachineBasicMultiChannelPerlin perlin;
         public float fovSpeed = 90f;
 
-        [Header("Debugging")]
-        public bool shouldDebugTargetFov = false;
-        public float debugTargetFov = 69f;
+        [Header("Sprinting FOV")]
+        public bool enableSprintingFov = true;
+        public float sprintingTargetFov = 80f;
+        public float nonSprintingTargetFov = 70f;
 
         private static MetaCamera instance;
         public static MetaCamera Instance => instance;
@@ -48,9 +49,13 @@ namespace Metater
         {
             if (cinemachineCamera == null || perlin == null) return;
 
-            if (shouldDebugTargetFov)
+            if (enableSprintingFov && MetaPlayerController.Instance != null && MetaPlayerController.Instance.IsActuallySprinting)
             {
-                TargetFov = debugTargetFov;
+                TargetFov = sprintingTargetFov;
+            }
+            else if (enableSprintingFov)
+            {
+                TargetFov = nonSprintingTargetFov;
             }
 
             float currentFov = cinemachineCamera.Lens.FieldOfView;

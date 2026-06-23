@@ -94,7 +94,7 @@ namespace Metater
             look = value.Get<Vector2>();
             if (IsUsingKeyboardMouse)
             {
-                Look(look);
+                Look(look * new Vector2(config.xScale, config.yScale));
             }
         }
 

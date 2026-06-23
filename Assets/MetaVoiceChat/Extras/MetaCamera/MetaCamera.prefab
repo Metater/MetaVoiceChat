@@ -109,5 +109,6 @@ MonoBehaviour:
   cinemachineCamera: {fileID: 307896869246359591}
   perlin: {fileID: 5794224153739323749}
   fovSpeed: 90
-  shouldDebugTargetFov: 0
-  debugTargetFov: 70
+  enableSprintingFov: 1
+  sprintingTargetFov: 80
+  nonSprintingTargetFov: 70
