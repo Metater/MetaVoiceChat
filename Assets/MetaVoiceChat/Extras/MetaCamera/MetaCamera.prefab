@@ -108,7 +108,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cinemachineCamera: {fileID: 307896869246359591}
   perlin: {fileID: 5794224153739323749}
-  fovSpeed: 90
+  fovSpeed: 40
   enableSprintingFov: 1
   sprintingTargetFov: 80
   nonSprintingTargetFov: 70

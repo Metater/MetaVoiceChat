@@ -97,6 +97,8 @@ MonoBehaviour:
   shadowsOnlyWhenEnabled:
   - {fileID: 8868201909687437470}
   - {fileID: 3675262249007649827}
+  shownWhenEnabled:
+  - {fileID: 5055725488689037907}
   debugBlockInput: 0
   debugBlockSprint: 0
   debugBlockJump: 0
@@ -1375,6 +1377,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: MetaCamera
       objectReference: {fileID: 0}
+    - target: {fileID: 3691217033317333942, guid: 2d6f08c839ee96e4a936591cc6af7999, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8283125572338656415, guid: 2d6f08c839ee96e4a936591cc6af7999, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -1423,5 +1429,10 @@ PrefabInstance:
 --- !u!4 &568525630199684474 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8283125572338656415, guid: 2d6f08c839ee96e4a936591cc6af7999, type: 3}
+  m_PrefabInstance: {fileID: 8435345310413421029}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &5055725488689037907 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3691217033317333942, guid: 2d6f08c839ee96e4a936591cc6af7999, type: 3}
   m_PrefabInstance: {fileID: 8435345310413421029}
   m_PrefabAsset: {fileID: 0}

@@ -49,13 +49,16 @@ namespace Metater
         {
             if (cinemachineCamera == null || perlin == null) return;
 
-            if (enableSprintingFov && MetaPlayerController.Instance != null && MetaPlayerController.Instance.IsActuallySprinting)
+            if (enableSprintingFov)
             {
-                TargetFov = sprintingTargetFov;
-            }
-            else if (enableSprintingFov)
-            {
-                TargetFov = nonSprintingTargetFov;
+                if (MetaPlayerController.Instance != null && MetaPlayerController.Instance.IsActuallySprinting)
+                {
+                    TargetFov = sprintingTargetFov;
+                }
+                else
+                {
+                    TargetFov = nonSprintingTargetFov;
+                }
             }
 
             float currentFov = cinemachineCamera.Lens.FieldOfView;

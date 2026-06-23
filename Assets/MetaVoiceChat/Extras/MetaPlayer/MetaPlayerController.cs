@@ -20,6 +20,7 @@ namespace Metater
         public Transform polarTransform;
         public Transform cameraTransform;
         public MeshRenderer[] shadowsOnlyWhenEnabled;
+        public GameObject[] shownWhenEnabled;
 
         [Header("Debug Blocker")]
         public bool debugBlockInput;
@@ -106,6 +107,17 @@ namespace Metater
 
         private void OnEnable()
         {
+            if (shownWhenEnabled != null)
+            {
+                foreach (var obj in shownWhenEnabled)
+                {
+                    if (obj != null)
+                    {
+                        obj.SetActive(true);
+                    }
+                }
+            }
+
             if (!TryGetComponent(out characterController))
             {
                 characterController = gameObject.AddComponent<CharacterController>();
@@ -127,9 +139,15 @@ namespace Metater
                 MetaCamera.Instance.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             }
 
-            foreach (var renderer in shadowsOnlyWhenEnabled)
+            if (shadowsOnlyWhenEnabled != null)
             {
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                foreach (var renderer in shadowsOnlyWhenEnabled)
+                {
+                    if (renderer != null)
+                    {
+                        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                    }
+                }
             }
 
             if (Instance != null && Instance != this)
@@ -144,6 +162,17 @@ namespace Metater
 
         private void OnDisable()
         {
+            if (shownWhenEnabled != null)
+            {
+                foreach (var obj in shownWhenEnabled)
+                {
+                    if (obj != null)
+                    {
+                        obj.SetActive(false);
+                    }
+                }
+            }
+
             if (TryGetComponent<CharacterController>(out var characterController))
             {
                 Destroy(characterController);
@@ -157,9 +186,15 @@ namespace Metater
                 MetaCamera.Instance.transform.localRotation = Quaternion.identity;
             }
 
-            foreach (var renderer in shadowsOnlyWhenEnabled)
+            if (shadowsOnlyWhenEnabled != null)
             {
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                foreach (var renderer in shadowsOnlyWhenEnabled)
+                {
+                    if (renderer != null)
+                    {
+                        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                    }
+                }
             }
 
             if (Instance == this)
