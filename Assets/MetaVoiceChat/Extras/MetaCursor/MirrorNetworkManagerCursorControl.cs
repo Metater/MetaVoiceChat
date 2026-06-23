@@ -3,23 +3,24 @@ using UnityEngine.InputSystem;
 
 #if MIRROR
 using Mirror;
-
-[RequireComponent(typeof(NetworkManager))]
 #endif
 
 namespace Metater
 {
+#if MIRROR
+    [RequireComponent(typeof(NetworkManager))]
+#endif
     public class MirrorNetworkManagerCursorControl : MonoBehaviour
     {
         public bool escapeMenuOpen = false;
 
 #if MIRROR
-    private NetworkManager netManager;
+        private NetworkManager netManager;
 
-    private void Awake()
-    {
-        netManager = GetComponent<NetworkManager>();
-    }
+        private void Awake()
+        {
+            netManager = GetComponent<NetworkManager>();
+        }
 #endif
 
         private void Update()
@@ -30,11 +31,11 @@ namespace Metater
             }
 
 #if MIRROR
-        if (netManager != null)
+            if (netManager != null)
 #endif
             {
 #if MIRROR
-            bool notConnected = !NetworkServer.active && !NetworkClient.active;
+                bool notConnected = !NetworkServer.active && !NetworkClient.active;
 #else
                 bool notConnected = false;
 #endif
