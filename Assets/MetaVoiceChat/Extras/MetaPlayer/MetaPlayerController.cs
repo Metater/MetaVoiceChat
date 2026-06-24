@@ -63,6 +63,7 @@ namespace Metater
         private readonly List<MetaPlayerKnockbackEnvelope> knockbackEnvelopes = new();
 
         public bool IsActuallySprinting => isSprinting && blocker.CanSprint;
+        public bool IsActuallySprintingAndMoving => IsActuallySprinting && isMoving;
         public bool IsFalling => fallTimer <= 0;
         public bool IsAtTerminalVelocity => -velocityY >= config.terminalVelocity;
         public bool IsThoroughlyGrounded => thoroughlyGroundedTimer > config.timeToBeThoroughlyGrounded;

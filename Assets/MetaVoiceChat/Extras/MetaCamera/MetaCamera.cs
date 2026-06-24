@@ -51,7 +51,7 @@ namespace Metater
 
             if (enableSprintingFov)
             {
-                if (MetaPlayerController.Instance != null && MetaPlayerController.Instance.IsActuallySprinting)
+                if (MetaPlayerController.Instance != null && MetaPlayerController.Instance.IsActuallySprintingAndMoving)
                 {
                     TargetFov = sprintingTargetFov;
                 }
