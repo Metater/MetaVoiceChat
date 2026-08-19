@@ -1,0 +1,10 @@
+{
+    "name": "MetaVoiceChat.Editor",
+    "references": [
+      "MetaVoiceChat"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}
