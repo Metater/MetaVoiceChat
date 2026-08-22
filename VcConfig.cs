@@ -12,9 +12,9 @@ namespace MetaVoiceChat
         public const int ClipLoopSeconds = 1;
         public const int SamplesPerClip = SamplesPerSecond * ClipLoopSeconds;
 
-        public const OpusBandwidth Bandwidth = OpusBandwidth.OPUS_BANDWIDTH_WIDEBAND;
+        public const OpusBandwidth Bandwidth = OpusBandwidth.OPUS_BANDWIDTH_FULLBAND;
         public const OpusBandwidth MaxBandwidth = Bandwidth;
-        public const OpusMode Mode = OpusMode.MODE_SILK_ONLY;
+        public const OpusMode Mode = OpusMode.MODE_AUTO;
 
         [Tooltip("Optimizes the codec for a particular application. The default is VOIP.")]
         public OpusApplication application = OpusApplication.OPUS_APPLICATION_VOIP;
