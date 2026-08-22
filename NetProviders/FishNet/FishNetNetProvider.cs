@@ -22,19 +22,50 @@ namespace MetaVoiceChat.NetProviders.FishNet
         public static IReadOnlyList<FishNetNetProvider> Instances => instances;
         #endregion
 
-        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.MetaVc.isDeafened;
+        bool INetProvider.IsLocalPlayerDeafened => !LocalPlayerInstance || LocalPlayerInstance.MetaVc.isDeafened;
 
         public MetaVc MetaVc { get; private set; }
 
+        private bool _wantsToInitialize;
+
         public override void OnStartClient()
         {
+            if (gameObject.activeInHierarchy)
+            {
+                Initialize();
+            }
+            else
+            {
+                _wantsToInitialize = true;
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (_wantsToInitialize)
+            {
+                Initialize();
+                _wantsToInitialize = false;
+            }
+        }
+
+        private void OnDisable()
+        {
+            _wantsToInitialize = true;
+        }
+
+        private void Initialize()
+        {
             #region Singleton
-            if (IsOwner)
+            if (Owner.IsLocalClient)
             {
                 LocalPlayerInstance = this;
             }
 
-            instances.Add(this);
+            if (!instances.Contains(this))
+            {
+                instances.Add(this);
+            }
             #endregion
 
             static int GetMaxDataBytesPerPacket(NetworkManager networkManager)
@@ -48,18 +79,21 @@ namespace MetaVoiceChat.NetProviders.FishNet
             }
 
             MetaVc = GetComponent<MetaVc>();
-            MetaVc.StartClient(this, IsOwner, GetMaxDataBytesPerPacket(NetworkManager));
+            MetaVc.StartClient(this, Owner.IsLocalClient, GetMaxDataBytesPerPacket(NetworkManager));
         }
 
         public override void OnStopClient()
         {
             #region Singleton
-            if (IsOwner)
+            if (Owner.IsLocalClient)
             {
                 LocalPlayerInstance = null;
             }
 
-            instances.Remove(this);
+            if (instances.Contains(this))
+            {
+                instances.Remove(this);
+            }
             #endregion
 
             MetaVc.StopClient();
