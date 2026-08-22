@@ -1,3 +1,5 @@
+//#define LOG_OnAudioFilterReadVcOutput
+
 using MetaVoiceChat.NetEq;
 using MetaVoiceChat.Output;
 using MetaVoiceChat.Utils;
@@ -31,6 +33,12 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         [SerializeField] private OnAudioFilterReadVcConfig audioFilterReadConfig;
         private const bool createPlaybackClip = true;
+
+#if LOG_OnAudioFilterReadVcOutput
+        [Header("Temporary Diagnostics")]
+        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField, Min(0.1f)] private float diagnosticsLogIntervalSeconds = 1f;
+#endif
 
         private UnityEngine.AudioSource audioSource;
         private AudioClip playbackClip;
@@ -81,6 +89,26 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private int audioThreadOutputSampleRate;
         private int audioThreadOutputChannels;
 
+#if LOG_OnAudioFilterReadVcOutput
+        private int receivedFrameCount;
+        private int acceptedFrameCount;
+        private int droppedInvalidFrameCount;
+        private int droppedFullFrameCount;
+        private int audioCallbackCount;
+        private int drainedFrameCount;
+        private int droppedStaleFrameCount;
+        private int netEqCreateCount;
+        private int getAudioCallCount;
+        private int getAudioSampleCount;
+        private int lastAudioDataLength;
+        private int lastAudioChannels;
+        private int lastGetAudioSamples;
+        private int lastOutputPeakPpm;
+        private int audioThreadExceptionCount;
+        private string lastAudioThreadException;
+        private double nextDiagnosticsLogTime;
+#endif
+
         public int CurrentBufferSizeMs
         {
             get { return Volatile.Read(ref currentBufferSizeMs); }
@@ -105,9 +133,17 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             ushort sequenceNumber,
             uint timestamp)
         {
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref receivedFrameCount);
+#endif
+
             if (Volatile.Read(ref acceptingFrames) == 0 ||
                 !IsValidFrameShape(frameSize, frequency, channels))
             {
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref droppedInvalidFrameCount);
+#endif
+
                 //UnityEngine.Debug.Log("Invalid frame shape or not accepting frames. FrameSize: " + frameSize + ", Frequency: " + frequency + ", Channels: " + channels, this);
                 return;
             }
@@ -115,12 +151,18 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             bool isSilence = frame.IsEmpty;
             if (!isSilence && frame.Length < frameSize)
             {
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref droppedInvalidFrameCount);
+#endif
                 return;
             }
 
             InitializePendingFramePool();
             if (!availableFrames.TryDequeue(out PendingFrame pendingFrame))
             {
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref droppedFullFrameCount);
+#endif
                 return;
             }
 
@@ -151,6 +193,9 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
                 pendingFrames.Enqueue(pendingFrame);
                 published = true;
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref acceptedFrameCount);
+#endif
             }
             finally
             {
@@ -240,6 +285,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
                 RestartPlaybackIfNeeded();
             }
+
+#if LOG_OnAudioFilterReadVcOutput
+            LogDiagnosticsIfNeeded();
+#endif
         }
 
         private void OnValidate()
@@ -272,6 +321,12 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             {
                 return;
             }
+
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref audioCallbackCount);
+            Volatile.Write(ref lastAudioDataLength, data.Length);
+            Volatile.Write(ref lastAudioChannels, channels);
+#endif
 
             try
             {
@@ -327,11 +382,19 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 }
 
                 ApplySpatializationMask(data, spatializationBuffer, data.Length);
+#if LOG_OnAudioFilterReadVcOutput
+                CacheOutputPeak(data);
+#endif
                 CacheAudioThreadLatency();
             }
             catch (Exception exception)
             {
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref audioThreadExceptionCount);
+                lastAudioThreadException = exception.GetType().Name + ": " + exception.Message;
+#else
                 _ = exception;
+#endif
                 DisposeAudioThreadState();
                 Array.Clear(data, 0, data.Length);
             }
@@ -350,6 +413,9 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 {
                     if (TimestampAgeMs(frame.ReceivedTimestamp, now) > MaxPendingFrameAgeMs)
                     {
+#if LOG_OnAudioFilterReadVcOutput
+                        Interlocked.Increment(ref droppedStaleFrameCount);
+#endif
                         continue;
                     }
 
@@ -382,6 +448,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     Volatile.Write(
                         ref receiveToInsertLatencyMs,
                         TimestampAgeMs(frame.ReceivedTimestamp, Stopwatch.GetTimestamp()));
+
+#if LOG_OnAudioFilterReadVcOutput
+                    Interlocked.Increment(ref drainedFrameCount);
+#endif
                 }
                 finally
                 {
@@ -423,6 +493,9 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             netEqSampleRate = sampleRate;
             netEqChannels = channels;
             audioThreadNetEqConfig = config;
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref netEqCreateCount);
+#endif
             return true;
         }
 
@@ -440,6 +513,11 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 int readLength = samplesPerChannel * netEqChannels;
                 float[] readBuffer = EnsureAudioBuffer(ref netEqReadBuffer, readLength, clearNewBuffer: false);
                 int readSamples = netEq.GetAudio(readBuffer, readLength);
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref getAudioCallCount);
+                Interlocked.Add(ref getAudioSampleCount, readSamples);
+                Volatile.Write(ref lastGetAudioSamples, readSamples);
+#endif
 
                 if (readSamples <= 0)
                 {
@@ -609,6 +687,60 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 Volatile.Write(ref currentBufferSizeMs, (int)NetEqInterop.CurrentBufferSizeMs(netEqPtr));
             }
         }
+
+#if LOG_OnAudioFilterReadVcOutput
+        private void CacheOutputPeak(float[] data)
+        {
+            float peak = 0f;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float value = Math.Abs(data[i]);
+                if (value > peak)
+                {
+                    peak = value;
+                }
+            }
+
+            Volatile.Write(ref lastOutputPeakPpm, (int)Math.Round(peak * 1000000f));
+        }
+#endif
+
+#if LOG_OnAudioFilterReadVcOutput
+        private void LogDiagnosticsIfNeeded()
+        {
+            if (!logDiagnostics || Time.unscaledTimeAsDouble < nextDiagnosticsLogTime)
+            {
+                return;
+            }
+
+            nextDiagnosticsLogTime = Time.unscaledTimeAsDouble + Math.Max(0.1f, diagnosticsLogIntervalSeconds);
+
+            string exception = lastAudioThreadException;
+            if (string.IsNullOrEmpty(exception))
+            {
+                exception = "none";
+            }
+
+            UnityEngine.Debug.Log(
+                $"{nameof(OnAudioFilterReadVcOutput)} diagnostics " +
+                $"active={Volatile.Read(ref outputActive)} accepting={Volatile.Read(ref acceptingFrames)} " +
+                $"source={(audioSource != null ? "yes" : "no")} playing={(audioSource != null && audioSource.isPlaying)} " +
+                $"clip={(audioSource != null && audioSource.clip != null ? audioSource.clip.name : "none")} " +
+                $"dspRate={Volatile.Read(ref cachedOutputSampleRate)} callbacks={Volatile.Read(ref audioCallbackCount)} " +
+                $"audioLen={Volatile.Read(ref lastAudioDataLength)} audioCh={Volatile.Read(ref lastAudioChannels)} " +
+                $"received={Volatile.Read(ref receivedFrameCount)} accepted={Volatile.Read(ref acceptedFrameCount)} " +
+                $"pending={pendingFrames.Count} available={availableFrames.Count} drained={Volatile.Read(ref drainedFrameCount)} " +
+                $"dropInvalid={Volatile.Read(ref droppedInvalidFrameCount)} dropFull={Volatile.Read(ref droppedFullFrameCount)} " +
+                $"dropStale={Volatile.Read(ref droppedStaleFrameCount)} " +
+                $"netEq={(netEq != null ? "yes" : "no")} netEqCreates={Volatile.Read(ref netEqCreateCount)} " +
+                $"netEqRate={netEqSampleRate} netEqCh={netEqChannels} currentBufferMs={Volatile.Read(ref currentBufferSizeMs)} " +
+                $"getAudioCalls={Volatile.Read(ref getAudioCallCount)} getAudioSamples={Volatile.Read(ref getAudioSampleCount)} " +
+                $"lastGetAudio={Volatile.Read(ref lastGetAudioSamples)} localOutMs={Volatile.Read(ref localOutputBufferMs)} " +
+                $"peak={Volatile.Read(ref lastOutputPeakPpm) / 1000000f:0.000000} " +
+                $"exceptions={Volatile.Read(ref audioThreadExceptionCount)} lastException={exception}",
+                this);
+        }
+#endif
 
         private void InitializePendingFramePool()
         {
@@ -800,7 +932,16 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 playbackClipSamples[i] = 1f;
             }
 
+#if LOG_OnAudioFilterReadVcOutput
+            if (!clip.SetData(playbackClipSamples, 0))
+            {
+                UnityEngine.Debug.LogWarning(
+                    $"{nameof(OnAudioFilterReadVcOutput)} failed to initialize the generated playback clip.",
+                    this);
+            }
+#else
             _ = clip.SetData(playbackClipSamples, 0);
+#endif
         }
 
         private static void ConfigureAudioSource(UnityEngine.AudioSource source)
