@@ -435,13 +435,13 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     }
 
                     NetEqInterop.InsertPacket(
-                        netEqPtr
+                        netEqPtr,
                         frame.SequenceNumber,
                         frame.Timestamp,
                         packetSamples,
                         frame.SampleLength,
-                        frame.SampleRate,
-                        frame.Channels,
+                        (uint)frame.SampleRate,
+                        (byte)frame.Channels,
                         frame.NetEqConfig.PacketDurationMs);
 
                     Volatile.Write(
@@ -482,12 +482,12 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             DisposeAudioThreadState();
 
             netEqPtr = NetEqInterop.CreateNetEq(
-                sampleRate,
-                channels,
+                (uint)sampleRate,
+                (byte)channels,
                 config.MaxPacketsInBuffer,
-                config.MaxDelayMs,
-                config.MinDelayMs,
-                config.AdditionalDelayMs);
+                (uint)config.MaxDelayMs,
+                (uint)config.MinDelayMs,
+                (uint)config.AdditionalDelayMs);
 
             netEqSampleRate = sampleRate;
             netEqChannels = channels;
@@ -643,10 +643,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private void DisposeAudioThreadState()
         {
-            if (netEq != null)
+            if (netEqPtr != IntPtr.Zero)
             {
-                netEq.Dispose();
-                netEq = null;
+                NetEqInterop.FreeNetEq(netEqPtr);
+                netEqPtr = IntPtr.Zero;
             }
 
             resampler.Free();
@@ -681,9 +681,9 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             }
 
             Volatile.Write(ref localOutputBufferMs, bufferedMs);
-            if (netEq != null)
+            if (netEqPtr != IntPtr.Zero)
             {
-                Volatile.Write(ref currentBufferSizeMs, netEq.CurrentBufferSizeMs);
+                Volatile.Write(ref currentBufferSizeMs, (int)NetEqInterop.CurrentBufferSizeMs(netEqPtr));
             }
         }
 
