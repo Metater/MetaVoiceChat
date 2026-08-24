@@ -15,8 +15,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
     [RequireComponent(typeof(UnityEngine.AudioSource))]
     public sealed partial class OnAudioFilterReadVcOutput : VcAudioOutput
     {
-        public float Gain { get; set; } = 1f;
-
         // NetEQ constants
         public const int DefaultMaxPacketsInBuffer = 50;
         public const int DefaultAdditionalDelayMs = 0;
@@ -196,7 +194,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 {
                     pendingFrame.EnsureCapacity(frameSize);
                     frame.Slice(0, frameSize).CopyTo(pendingFrame.Samples);
-                    ApplyGain(pendingFrame.Samples, frameSize);
                 }
 
                 pendingFrame.SampleLength = frameSize;
@@ -335,16 +332,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         {
             CacheMainThreadSettings();
             Volatile.Write(ref resetOutputConversionRequested, 1);
-
-            if (Volatile.Read(ref outputActive) != 0 && audioSource != null && createPlaybackClip)
-            {
-                CreatePlaybackClip(forceRecreate: true);
-            }
-
-            if (Volatile.Read(ref outputActive) != 0 && audioSource != null)
-            {
-                RestartPlaybackIfNeeded();
-            }
+            Volatile.Write(ref recreatePlaybackClipRequested, 1);
         }
 
         private void TryActivateOutput()
@@ -374,7 +362,8 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
             if (createPlaybackClip)
             {
-                CreatePlaybackClip();
+                CreatePlaybackClip(
+                    forceRecreate: Interlocked.Exchange(ref recreatePlaybackClipRequested, 0) != 0);
             }
 
             Volatile.Write(ref audioCallbacksBlocked, 0);
@@ -1170,6 +1159,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private static void ConfigureAudioSource(UnityEngine.AudioSource source)
         {
+            source.playOnAwake = false;
             source.loop = true;
             source.dopplerLevel = 0f;
             source.spatializePostEffects = false;
@@ -1237,24 +1227,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 #else
             return false;
 #endif
-        }
-
-        private void ApplyGain(float[] samples, int sampleCount)
-        {
-            float gain = Mathf.Clamp(Gain, 0f, 3f);
-            if (gain <= 0f)
-            {
-                Array.Clear(samples, 0, sampleCount);
-                return;
-            }
-
-            float tanhGain = (float)Math.Tanh(gain);
-            for (int i = 0; i < sampleCount; i++)
-            {
-                const float bias = 0.01f;
-                float x = (samples[i] + bias) * gain;
-                samples[i] = (float)Math.Tanh(x) / tanhGain - bias;
-            }
         }
 
         private static int TenMsSamplesPerChannel(int sampleRate)
