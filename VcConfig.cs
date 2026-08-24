@@ -19,9 +19,9 @@ namespace MetaVoiceChat
         [Tooltip("Optimizes the codec for a particular application. The default is VOIP.")]
         public OpusApplication application = OpusApplication.OPUS_APPLICATION_VOIP;
 
-        [Tooltip("0 gives the fastest encoding but lower quality, while 10 gives the highest quality but slower encoding. The default is 10. 10 is still pretty darn fast.")]
+        [Tooltip("0 gives the fastest encoding but lower quality, while 10 gives the highest quality but slower encoding. The default is 6.")]
         [Range(0, 10)]
-        public int complexity = 10;
+        public int complexity = 6;
 
         [Tooltip("The size of the groups of networked audio samples in milliseconds. The only valid choices are 10ms (480 samples), 20ms (960 samples), and 40ms (1920 samples). The default is 20ms (960 samples). Longer frame sizes reduce network traffic but increase susceptibility to dropped packets and introduce more latency in the audio output buffer.")]
         public OpusFramesize framesize = OpusFramesize.OPUS_FRAMESIZE_20_MS;

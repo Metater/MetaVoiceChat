@@ -3,6 +3,10 @@
 - Better audio quality because of incorrectly selected bandwidth for 48kHz: https://wiki.xiph.org/Opus_Recommended_Settings
     - Was "WideBand", now its "FullBand". "WideBand" is for 16kHz.
 - Opus "Auto" mode instead of forcing "SILK"
+- Opus complexity of 6 is now the default, not 10.
+- Improved FishNetNetProvider. Thank you How to Fish team!
+- PurrNetNetProvider. Thank you Nikita Kolpakov!
+- Opus IL2CPP support. Thank you ThijsCleVR!
 
 12/20/2025 (v4.2):
 - MirrorNetProvider: Fix null reference if a player joins late with incoming audio frames #21. Thanks @EterniumDev

@@ -1171,7 +1171,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private static void ConfigureAudioSource(UnityEngine.AudioSource source)
         {
             source.loop = true;
-            source.priority = 0;
             source.dopplerLevel = 0f;
             source.spatializePostEffects = false;
         }
