@@ -13,7 +13,7 @@ using UnityEngine.Assertions;
 namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 {
     [RequireComponent(typeof(UnityEngine.AudioSource))]
-    public sealed class OnAudioFilterReadVcOutput : VcAudioOutput
+    public sealed partial class OnAudioFilterReadVcOutput : VcAudioOutput
     {
         public float Gain { get; set; } = 1f;
 
@@ -26,10 +26,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         public const int DefaultResamplerBufferMs = 10;
         // Other constants
         private const int PendingFramePoolCapacity = 32;
-        private const int MaxPacketDurationMs = 500;
         private const int MaxPendingFrameAgeMs = 60;
         private const int MaxPacketsDrainedPerCallback = 32;
         private const int MaxNetEqReadsPerCallback = 32;
+        private const int NetworkInputSampleRate = VcConfig.SamplesPerSecond;
 
         [SerializeField] private OnAudioFilterReadVcConfig audioFilterReadConfig;
         private const bool createPlaybackClip = true;
@@ -51,6 +51,11 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private int acceptingFrames;
         private int outputActive;
+        private int unsupportedPlatformErrorLogged;
+        private int audioCallbacksBlocked = 1;
+        private int audioCallbackDepth;
+        private int disposeAudioThreadStateRequested;
+        private int activateOutputRequested;
         private int recreatePlaybackClipRequested;
         private int resetAudioThreadStateRequested;
         private int resetOutputConversionRequested;
@@ -76,12 +81,12 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private IntPtr netEqPtr = IntPtr.Zero;
         private readonly OneWayResampler resampler = new OneWayResampler();
         private readonly SampleFifo outputFifo = new SampleFifo();
+        private readonly UnmanagedFloatArray netEqPacketBuffer = new UnmanagedFloatArray();
+        private readonly UnmanagedFloatArray netEqReadBuffer = new UnmanagedFloatArray();
 
-        private float[] netEqReadBuffer = Array.Empty<float>();
-        private float[] resamplerInputBuffer = Array.Empty<float>();
+        private float[] netEqBatchBuffer = Array.Empty<float>();
         private float[] resamplerOutputBuffer = Array.Empty<float>();
         private float[] channelConvertBuffer = Array.Empty<float>();
-        private float[] silencePacketBuffer = Array.Empty<float>();
         private float[] spatializationInputBuffer = Array.Empty<float>();
         private int netEqSampleRate;
         private int netEqChannels;
@@ -98,6 +103,12 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private int drainedFrameCount;
         private int droppedStaleFrameCount;
         private int netEqCreateCount;
+        private int netEqCreateFailureCount;
+        private int netEqFreeCount;
+        private int invalidGetAudioResultCount;
+        private int cleanupRequestCount;
+        private int deferredCleanupCount;
+        private int completedCleanupCount;
         private int getAudioCallCount;
         private int getAudioSampleCount;
         private int lastAudioDataLength;
@@ -136,6 +147,18 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 #if LOG_OnAudioFilterReadVcOutput
             Interlocked.Increment(ref receivedFrameCount);
 #endif
+
+            if (channels != 1)
+            {
+                throw new NotSupportedException(
+                    $"{nameof(OnAudioFilterReadVcOutput)} only supports mono network audio. Received {channels} channels.");
+            }
+
+            if (frequency != NetworkInputSampleRate)
+            {
+                throw new NotSupportedException(
+                    $"{nameof(OnAudioFilterReadVcOutput)} only supports {NetworkInputSampleRate} Hz network audio. Received {frequency} Hz.");
+            }
 
             if (Volatile.Read(ref acceptingFrames) == 0 ||
                 !IsValidFrameShape(frameSize, frequency, channels))
@@ -213,6 +236,23 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private void OnEnable()
         {
+            Volatile.Write(ref acceptingFrames, 0);
+            Volatile.Write(ref outputActive, 0);
+            Volatile.Write(ref audioCallbacksBlocked, 1);
+
+            if (!IsNativeNetEqSupportedPlatform())
+            {
+                if (Interlocked.Exchange(ref unsupportedPlatformErrorLogged, 1) == 0)
+                {
+                    UnityEngine.Debug.LogError(
+                        $"{nameof(OnAudioFilterReadVcOutput)} requires the trusted Windows x64 NetEQ plugin. " +
+                        "Use VcAudioSourceOutput on unsupported platforms.",
+                        this);
+                }
+                enabled = false;
+                return;
+            }
+
             AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
 
             CacheMainThreadSettings();
@@ -227,26 +267,15 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             }
 
             ConfigureAudioSource(audioSource);
-
-            Volatile.Write(ref resetAudioThreadStateRequested, 1);
-            Volatile.Write(ref resetOutputConversionRequested, 1);
-            Volatile.Write(ref outputActive, 1);
-            Volatile.Write(ref acceptingFrames, 1);
-
-            if (createPlaybackClip)
-            {
-                CreatePlaybackClip();
-            }
-
-            audioSource.Play();
+            Volatile.Write(ref activateOutputRequested, 1);
+            TryActivateOutput();
         }
 
         private void OnDisable()
         {
             AudioSettings.OnAudioConfigurationChanged -= OnAudioConfigurationChanged;
-            Volatile.Write(ref acceptingFrames, 0);
-            Volatile.Write(ref outputActive, 0);
-            Volatile.Write(ref resetAudioThreadStateRequested, 1);
+            Volatile.Write(ref activateOutputRequested, 0);
+            RequestAudioThreadStateDisposal();
 
             if (audioSource != null)
             {
@@ -262,18 +291,21 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 Destroy(playbackClip);
                 playbackClip = null;
             }
+
+            ClearPendingFrames();
         }
 
         private void OnDestroy()
         {
-            Volatile.Write(ref acceptingFrames, 0);
-            Volatile.Write(ref outputActive, 0);
-            Volatile.Write(ref resetAudioThreadStateRequested, 1);
+            Volatile.Write(ref activateOutputRequested, 0);
+            RequestAudioThreadStateDisposal();
         }
 
         private void Update()
         {
             CacheMainThreadSettings();
+            TryCompleteRequestedAudioThreadStateDisposal();
+            TryActivateOutput();
 
             if (Volatile.Read(ref outputActive) != 0 && audioSource != null)
             {
@@ -304,7 +336,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             CacheMainThreadSettings();
             Volatile.Write(ref resetOutputConversionRequested, 1);
 
-            if (audioSource != null && createPlaybackClip)
+            if (Volatile.Read(ref outputActive) != 0 && audioSource != null && createPlaybackClip)
             {
                 CreatePlaybackClip(forceRecreate: true);
             }
@@ -315,12 +347,131 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             }
         }
 
+        private void TryActivateOutput()
+        {
+            if (Volatile.Read(ref activateOutputRequested) == 0 || audioSource == null)
+            {
+                return;
+            }
+
+            TryCompleteRequestedAudioThreadStateDisposal();
+            if (Volatile.Read(ref disposeAudioThreadStateRequested) != 0 ||
+                Volatile.Read(ref audioCallbackDepth) != 0)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref activateOutputRequested, 0, 1) != 1)
+            {
+                return;
+            }
+
+            // Reaching activation means the prior audio-thread state is already disposed.
+            Volatile.Write(ref resetAudioThreadStateRequested, 0);
+            Volatile.Write(ref resetOutputConversionRequested, 1);
+            Volatile.Write(ref outputActive, 1);
+            Volatile.Write(ref acceptingFrames, 1);
+
+            if (createPlaybackClip)
+            {
+                CreatePlaybackClip();
+            }
+
+            Volatile.Write(ref audioCallbacksBlocked, 0);
+            audioSource.Play();
+        }
+
+        private void RequestAudioThreadStateDisposal()
+        {
+            Volatile.Write(ref acceptingFrames, 0);
+            Volatile.Write(ref audioCallbacksBlocked, 1);
+            Volatile.Write(ref outputActive, 0);
+            Volatile.Write(ref resetAudioThreadStateRequested, 0);
+            Interlocked.Exchange(ref disposeAudioThreadStateRequested, 1);
+
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref cleanupRequestCount);
+            if (Volatile.Read(ref audioCallbackDepth) != 0)
+            {
+                Interlocked.Increment(ref deferredCleanupCount);
+            }
+#endif
+
+            TryCompleteRequestedAudioThreadStateDisposal();
+        }
+
+        private bool TryCompleteRequestedAudioThreadStateDisposal()
+        {
+            if (Volatile.Read(ref audioCallbackDepth) != 0)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref disposeAudioThreadStateRequested, 0, 1) != 1)
+            {
+                return true;
+            }
+
+            DisposeAudioThreadState();
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref completedCleanupCount);
+#endif
+            return true;
+        }
+
+        private bool TryEnterAudioCallback()
+        {
+            if (Volatile.Read(ref audioCallbacksBlocked) != 0)
+            {
+                return false;
+            }
+
+            Interlocked.Increment(ref audioCallbackDepth);
+            if (Volatile.Read(ref audioCallbacksBlocked) == 0)
+            {
+                return true;
+            }
+
+            ExitAudioCallback();
+            return false;
+        }
+
+        private void ExitAudioCallback()
+        {
+            int remaining = Interlocked.Decrement(ref audioCallbackDepth);
+            Assert.IsTrue(remaining >= 0, "Audio callback depth became negative.");
+            if (remaining == 0)
+            {
+                TryCompleteRequestedAudioThreadStateDisposal();
+            }
+        }
+
         private void OnAudioFilterRead(float[] data, int channels)
         {
             if (data == null)
             {
                 return;
             }
+
+            if (!TryEnterAudioCallback())
+            {
+                Array.Clear(data, 0, data.Length);
+                return;
+            }
+
+            try
+            {
+                OnEditorAudioCallbackAdmitted();
+                OnAudioFilterReadAdmitted(data, channels);
+            }
+            finally
+            {
+                ExitAudioCallback();
+            }
+        }
+
+        private void OnAudioFilterReadAdmitted(float[] data, int channels)
+        {
 
 #if LOG_OnAudioFilterReadVcOutput
             Interlocked.Increment(ref audioCallbackCount);
@@ -340,8 +491,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 if (Volatile.Read(ref outputActive) == 0)
                 {
                     ClearPendingFrames();
-                    DisposeAudioThreadState();
-                    Volatile.Write(ref resetAudioThreadStateRequested, 0);
                     Array.Clear(data, 0, data.Length);
                     return;
                 }
@@ -372,10 +521,15 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     return;
                 }
 
+                // Creating or reconfiguring NetEQ disposes the prior audio-thread state,
+                // including these conversion fields. Restore the callback's active format
+                // before filling/caching the output FIFO.
+                audioThreadOutputSampleRate = outputSampleRate;
+                audioThreadOutputChannels = channels;
+
                 FillOutputFifo(data.Length, outputSampleRate, channels);
 
                 int copied = outputFifo.Read(data, 0, data.Length);
-                Assert.AreEqual(copied, data.Length, "Expected data read from output FIFO to match DSP buffer size.");
                 if (copied < data.Length)
                 {
                     Array.Clear(data, copied, data.Length - copied);
@@ -389,16 +543,26 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             }
             catch (Exception exception)
             {
-#if LOG_OnAudioFilterReadVcOutput
-                Interlocked.Increment(ref audioThreadExceptionCount);
-                lastAudioThreadException = exception.GetType().Name + ": " + exception.Message;
-#else
-                _ = exception;
-#endif
+                RecordAudioThreadException(exception);
                 DisposeAudioThreadState();
                 Array.Clear(data, 0, data.Length);
             }
         }
+
+        private void RecordAudioThreadException(Exception exception)
+        {
+#if LOG_OnAudioFilterReadVcOutput
+            Interlocked.Increment(ref audioThreadExceptionCount);
+            lastAudioThreadException = exception.GetType().Name + ": " + exception.Message;
+#else
+            _ = exception;
+#endif
+            OnEditorAudioThreadException(exception);
+        }
+
+        partial void OnEditorAudioCallbackAdmitted();
+        partial void OnEditorAudioThreadException(Exception exception);
+        partial void OnEditorAudioThreadStateDisposed();
 
         private void DrainPendingFramesAudioThread()
         {
@@ -424,15 +588,14 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                         continue;
                     }
 
-                    float[] packetSamples;
+                    IntPtr packetSamples = netEqPacketBuffer.GetOrInit(frame.SampleLength, out _);
                     if (frame.IsSilence)
                     {
-                        packetSamples = EnsureAudioBuffer(ref silencePacketBuffer, frame.SampleLength, clearNewBuffer: false);
-                        Array.Clear(packetSamples, 0, frame.SampleLength);
+                        netEqPacketBuffer.Zero();
                     }
                     else
                     {
-                        packetSamples = frame.Samples;
+                        netEqPacketBuffer.Fill(new ArraySegment<float>(frame.Samples, 0, frame.SampleLength));
                     }
 
                     NetEqInterop.InsertPacket(
@@ -442,8 +605,8 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                         packetSamples,
                         frame.SampleLength,
                         (uint)frame.SampleRate,
-                        (byte)frame.Channels,
-                        frame.NetEqConfig.PacketDurationMs);
+                        (byte)1,
+                        (uint)frame.NetEqConfig.PacketDurationMs);
 
                     Volatile.Write(
                         ref receiveToInsertLatencyMs,
@@ -467,7 +630,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private bool EnsureNetEqFor(int sampleRate, int channels, NetEqConfig config)
         {
-            if (sampleRate <= 0 || channels <= 0 || channels > 2)
+            if (sampleRate != NetworkInputSampleRate || channels != 1)
             {
                 return false;
             }
@@ -482,16 +645,25 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
             DisposeAudioThreadState();
 
-            netEqPtr = NetEqInterop.CreateNetEq(
+            IntPtr createdNetEq = NetEqInterop.CreateNetEq(
                 (uint)sampleRate,
-                (byte)channels,
+                (byte)1,
                 config.MaxPacketsInBuffer,
                 (uint)config.MaxDelayMs,
                 (uint)config.MinDelayMs,
                 (uint)config.AdditionalDelayMs);
 
+            if (createdNetEq == IntPtr.Zero)
+            {
+#if LOG_OnAudioFilterReadVcOutput
+                Interlocked.Increment(ref netEqCreateFailureCount);
+#endif
+                return false;
+            }
+
+            netEqPtr = createdNetEq;
             netEqSampleRate = sampleRate;
-            netEqChannels = channels;
+            netEqChannels = 1;
             audioThreadNetEqConfig = config;
 #if LOG_OnAudioFilterReadVcOutput
             Interlocked.Increment(ref netEqCreateCount);
@@ -506,25 +678,61 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 return;
             }
 
-            int safety = 0;
-            while (outputFifo.Count < requiredSamples && safety++ < MaxNetEqReadsPerCallback)
+            int readsThisCallback = 0;
+            int batchMs = Math.Clamp(Volatile.Read(ref cachedResamplerBufferMs), 10, 100);
+            batchMs = Math.Clamp((batchMs + 5) / 10 * 10, 10, 100);
+            int targetBatchSamples = Math.Max(
+                TenMsSamplesPerChannel(netEqSampleRate) * netEqChannels,
+                netEqSampleRate * batchMs / 1000 * netEqChannels);
+
+            while (outputFifo.Count < requiredSamples && readsThisCallback < MaxNetEqReadsPerCallback)
             {
-                int samplesPerChannel = TenMsSamplesPerChannel(netEqSampleRate);
-                int readLength = samplesPerChannel * netEqChannels;
-                float[] readBuffer = EnsureAudioBuffer(ref netEqReadBuffer, readLength, clearNewBuffer: false);
-                int readSamples = netEq.GetAudio(readBuffer, readLength);
+                float[] batchBuffer = EnsureAudioBuffer(ref netEqBatchBuffer, targetBatchSamples, clearNewBuffer: false);
+                int batchSampleCount = 0;
+
+                while (batchSampleCount < targetBatchSamples && readsThisCallback < MaxNetEqReadsPerCallback)
+                {
+                    int samplesPerChannel = TenMsSamplesPerChannel(netEqSampleRate);
+                    int readLength = samplesPerChannel * netEqChannels;
+                    IntPtr readSamplesPtr = netEqReadBuffer.GetOrInit(readLength, out float[] readBuffer, initToZero: false);
+                    int readSamples = NetEqInterop.GetAudio(netEqPtr, readSamplesPtr, readLength);
+                    readsThisCallback++;
 #if LOG_OnAudioFilterReadVcOutput
-                Interlocked.Increment(ref getAudioCallCount);
-                Interlocked.Add(ref getAudioSampleCount, readSamples);
-                Volatile.Write(ref lastGetAudioSamples, readSamples);
+                    Interlocked.Increment(ref getAudioCallCount);
+                    Interlocked.Add(ref getAudioSampleCount, Math.Max(0, readSamples));
+                    Volatile.Write(ref lastGetAudioSamples, readSamples);
 #endif
 
-                if (readSamples <= 0)
+                    if (readSamples < 0 || readSamples > readLength)
+                    {
+#if LOG_OnAudioFilterReadVcOutput
+                        Interlocked.Increment(ref invalidGetAudioResultCount);
+#endif
+                        throw new InvalidOperationException(
+                            $"NetEQ returned {readSamples} samples for a buffer with capacity {readLength}.");
+                    }
+
+                    if (readSamples == 0)
+                    {
+                        break;
+                    }
+
+                    netEqReadBuffer.ReadFromUnmanaged(readSamples);
+                    Array.Copy(readBuffer, 0, batchBuffer, batchSampleCount, readSamples);
+                    batchSampleCount += readSamples;
+
+                    if (readSamples < readLength)
+                    {
+                        break;
+                    }
+                }
+
+                if (batchSampleCount == 0)
                 {
                     break;
                 }
 
-                AppendToOutputFifo(readBuffer, readSamples, outputSampleRate, outputChannels);
+                AppendToOutputFifo(batchBuffer, batchSampleCount, outputSampleRate, outputChannels);
             }
 
             CacheAudioThreadLatency();
@@ -535,6 +743,11 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             float[] samples = input;
             int sampleCount = inputSampleCount;
             int channels = netEqChannels;
+
+            if (channels != 1 || inputSampleCount <= 0)
+            {
+                return;
+            }
 
             if (netEqSampleRate != outputSampleRate)
             {
@@ -549,9 +762,6 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     (int)Math.Ceiling(inputFrames * (double)outputSampleRate / netEqSampleRate) + 8);
                 int outputSampleCapacity = outputFrames * netEqChannels;
 
-                float[] resampleInput = EnsureAudioBuffer(ref resamplerInputBuffer, inputSampleCount, clearNewBuffer: false);
-                Array.Copy(input, 0, resampleInput, 0, inputSampleCount);
-
                 float[] resampleOutput = EnsureAudioBuffer(ref resamplerOutputBuffer, outputSampleCapacity, clearNewBuffer: false);
                 int inLen = inputFrames;
                 int outLen = outputFrames;
@@ -562,21 +772,22 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     outputSampleRate,
                     Volatile.Read(ref cachedResamplerQuality));
                 resampler.ProcessInterleaved(
-                    resampleInput.AsSpan(0, inputSampleCount),
+                    input.AsSpan(0, inputSampleCount),
                     ref inLen,
                     resampleOutput.AsSpan(0, outputSampleCapacity),
                     ref outLen);
 
                 if (inLen != inputFrames)
                 {
-                    return;
+                    throw new InvalidOperationException(
+                        $"The resampler consumed {inLen} of {inputFrames} input frames.");
                 }
 
                 samples = resampleOutput;
                 sampleCount = outLen * netEqChannels;
             }
 
-            if (channels == outputChannels)
+            if (outputChannels == 1)
             {
                 outputFifo.Write(samples, 0, sampleCount);
                 return;
@@ -586,43 +797,13 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             int convertedSampleCount = frameCount * outputChannels;
             float[] converted = EnsureAudioBuffer(ref channelConvertBuffer, convertedSampleCount, clearNewBuffer: false);
 
-            if (channels == 1)
+            for (int inIndex = 0, outIndex = 0; inIndex < frameCount; inIndex++)
             {
-                for (int inIndex = 0, outIndex = 0; inIndex < frameCount; inIndex++)
+                float sample = samples[inIndex];
+                for (int outputChannel = 0; outputChannel < outputChannels; outputChannel++, outIndex++)
                 {
-                    float sample = samples[inIndex];
-                    for (int outputChannel = 0; outputChannel < outputChannels; outputChannel++, outIndex++)
-                    {
-                        converted[outIndex] = sample;
-                    }
+                    converted[outIndex] = sample;
                 }
-            }
-            else if (channels == 2 && outputChannels == 1)
-            {
-                for (int inIndex = 0, outIndex = 0; outIndex < frameCount; inIndex += 2, outIndex++)
-                {
-                    converted[outIndex] = (samples[inIndex] + samples[inIndex + 1]) * 0.5f;
-                }
-            }
-            else if (channels == 2)
-            {
-                for (int inIndex = 0, outIndex = 0; inIndex < sampleCount; inIndex += 2)
-                {
-                    converted[outIndex++] = samples[inIndex];
-                    if (outputChannels > 1)
-                    {
-                        converted[outIndex++] = samples[inIndex + 1];
-                    }
-
-                    for (int outputChannel = 2; outputChannel < outputChannels; outputChannel++, outIndex++)
-                    {
-                        converted[outIndex] = (samples[inIndex] + samples[inIndex + 1]) * 0.5f;
-                    }
-                }
-            }
-            else
-            {
-                Array.Clear(converted, 0, convertedSampleCount);
             }
 
             outputFifo.Write(converted, 0, convertedSampleCount);
@@ -644,13 +825,52 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         private void DisposeAudioThreadState()
         {
-            if (netEqPtr != IntPtr.Zero)
+            Exception cleanupException = null;
+            IntPtr pointerToFree = netEqPtr;
+            netEqPtr = IntPtr.Zero;
+
+            if (pointerToFree != IntPtr.Zero)
             {
-                NetEqInterop.FreeNetEq(netEqPtr);
-                netEqPtr = IntPtr.Zero;
+                try
+                {
+                    NetEqInterop.FreeNetEq(pointerToFree);
+#if LOG_OnAudioFilterReadVcOutput
+                    Interlocked.Increment(ref netEqFreeCount);
+#endif
+                }
+                catch (Exception exception)
+                {
+                    cleanupException = exception;
+                }
             }
 
-            resampler.Free();
+            try
+            {
+                netEqPacketBuffer.Free();
+            }
+            catch (Exception exception)
+            {
+                cleanupException ??= exception;
+            }
+
+            try
+            {
+                netEqReadBuffer.Free();
+            }
+            catch (Exception exception)
+            {
+                cleanupException ??= exception;
+            }
+
+            try
+            {
+                resampler.Free();
+            }
+            catch (Exception exception)
+            {
+                cleanupException ??= exception;
+            }
+
             outputFifo.Clear();
             netEqSampleRate = 0;
             netEqChannels = 0;
@@ -661,6 +881,13 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             Volatile.Write(ref currentBufferSizeMs, 0);
             Volatile.Write(ref receiveToInsertLatencyMs, 0);
             Volatile.Write(ref localOutputBufferMs, 0);
+
+            if (cleanupException != null)
+            {
+                RecordAudioThreadException(cleanupException);
+            }
+
+            OnEditorAudioThreadStateDisposed();
         }
 
         private void ResetOutputConversionState()
@@ -724,6 +951,8 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             UnityEngine.Debug.Log(
                 $"{nameof(OnAudioFilterReadVcOutput)} diagnostics " +
                 $"active={Volatile.Read(ref outputActive)} accepting={Volatile.Read(ref acceptingFrames)} " +
+                $"blocked={Volatile.Read(ref audioCallbacksBlocked)} callbackDepth={Volatile.Read(ref audioCallbackDepth)} " +
+                $"disposePending={Volatile.Read(ref disposeAudioThreadStateRequested)} activatePending={Volatile.Read(ref activateOutputRequested)} " +
                 $"source={(audioSource != null ? "yes" : "no")} playing={(audioSource != null && audioSource.isPlaying)} " +
                 $"clip={(audioSource != null && audioSource.clip != null ? audioSource.clip.name : "none")} " +
                 $"dspRate={Volatile.Read(ref cachedOutputSampleRate)} callbacks={Volatile.Read(ref audioCallbackCount)} " +
@@ -732,10 +961,14 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 $"pending={pendingFrames.Count} available={availableFrames.Count} drained={Volatile.Read(ref drainedFrameCount)} " +
                 $"dropInvalid={Volatile.Read(ref droppedInvalidFrameCount)} dropFull={Volatile.Read(ref droppedFullFrameCount)} " +
                 $"dropStale={Volatile.Read(ref droppedStaleFrameCount)} " +
-                $"netEq={(netEq != null ? "yes" : "no")} netEqCreates={Volatile.Read(ref netEqCreateCount)} " +
+                $"netEq={(netEqPtr != IntPtr.Zero ? "yes" : "no")} creates={Volatile.Read(ref netEqCreateCount)} " +
+                $"createFailures={Volatile.Read(ref netEqCreateFailureCount)} frees={Volatile.Read(ref netEqFreeCount)} " +
                 $"netEqRate={netEqSampleRate} netEqCh={netEqChannels} currentBufferMs={Volatile.Read(ref currentBufferSizeMs)} " +
                 $"getAudioCalls={Volatile.Read(ref getAudioCallCount)} getAudioSamples={Volatile.Read(ref getAudioSampleCount)} " +
-                $"lastGetAudio={Volatile.Read(ref lastGetAudioSamples)} localOutMs={Volatile.Read(ref localOutputBufferMs)} " +
+                $"lastGetAudio={Volatile.Read(ref lastGetAudioSamples)} invalidReads={Volatile.Read(ref invalidGetAudioResultCount)} " +
+                $"batchMs={Volatile.Read(ref cachedResamplerBufferMs)} localOutMs={Volatile.Read(ref localOutputBufferMs)} " +
+                $"cleanupRequests={Volatile.Read(ref cleanupRequestCount)} deferredCleanup={Volatile.Read(ref deferredCleanupCount)} " +
+                $"completedCleanup={Volatile.Read(ref completedCleanupCount)} " +
                 $"peak={Volatile.Read(ref lastOutputPeakPpm) / 1000000f:0.000000} " +
                 $"exceptions={Volatile.Read(ref audioThreadExceptionCount)} lastException={exception}",
                 this);
@@ -932,16 +1165,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 playbackClipSamples[i] = 1f;
             }
 
-#if LOG_OnAudioFilterReadVcOutput
-            if (!clip.SetData(playbackClipSamples, 0))
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"{nameof(OnAudioFilterReadVcOutput)} failed to initialize the generated playback clip.",
-                    this);
-            }
-#else
             _ = clip.SetData(playbackClipSamples, 0);
-#endif
         }
 
         private static void ConfigureAudioSource(UnityEngine.AudioSource source)
@@ -993,8 +1217,8 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private static bool IsValidFrameShape(int frameSize, int inputSampleRate, int inputChannels)
         {
             if (frameSize <= 0 ||
-                inputSampleRate <= 0 ||
-                (inputChannels != 1 && inputChannels != 2) ||
+                inputSampleRate != NetworkInputSampleRate ||
+                inputChannels != 1 ||
                 frameSize % inputChannels != 0)
             {
                 return false;
@@ -1002,12 +1226,18 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
             int samplesPerChannel = frameSize / inputChannels;
             int durationMs = samplesPerChannel * 1000 / inputSampleRate;
-            int maxSamples = inputSampleRate * MaxPacketDurationMs / 1000 * inputChannels;
 
-            return frameSize <= maxSamples &&
-                samplesPerChannel * 1000 == durationMs * inputSampleRate &&
-                durationMs > 0 &&
-                durationMs <= MaxPacketDurationMs;
+            return samplesPerChannel * 1000 == durationMs * inputSampleRate &&
+                (durationMs == 10 || durationMs == 20 || durationMs == 40);
+        }
+
+        private static bool IsNativeNetEqSupportedPlatform()
+        {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            return IntPtr.Size == 8;
+#else
+            return false;
+#endif
         }
 
         private void ApplyGain(float[] samples, int sampleCount)
@@ -1074,7 +1304,25 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
 
         protected override void ReceiveFrame(int index, float[] samples, float targetLatency)
         {
-            throw new NotImplementedException();
+            VcConfig config = metaVc != null ? metaVc.config : null;
+            if (config == null || config.samplesPerFrame <= 0)
+            {
+                return;
+            }
+
+            int frameSize = config.samplesPerFrame;
+            ulong frameIndex = (ulong)Math.Max(index, 0);
+            ushort sequenceNumber = (ushort)(frameIndex % (ushort.MaxValue + 1UL));
+            uint timestamp = (uint)(frameIndex * (ulong)frameSize % (uint.MaxValue + 1UL));
+            Span<float> frame = samples == null ? Span<float>.Empty : samples.AsSpan();
+
+            Process(
+                frame,
+                frameSize,
+                NetworkInputSampleRate,
+                1,
+                sequenceNumber,
+                timestamp);
         }
 
         private sealed class PendingFrame
