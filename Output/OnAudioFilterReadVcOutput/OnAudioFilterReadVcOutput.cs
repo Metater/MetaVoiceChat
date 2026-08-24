@@ -1161,7 +1161,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         {
             source.playOnAwake = false;
             source.loop = true;
+            source.pitch = 1f;
             source.dopplerLevel = 0f;
+            source.bypassReverbZones = true;
+            source.reverbZoneMix = 0f;
             source.spatializePostEffects = false;
         }
 
