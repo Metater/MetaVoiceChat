@@ -1102,11 +1102,10 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private void CreatePlaybackClip(bool forceRecreate = false)
         {
             int sampleRate = Math.Max(1, Volatile.Read(ref cachedOutputSampleRate));
-            int channels = Math.Max(1, Volatile.Read(ref cachedOutputChannels));
             if (!forceRecreate &&
                 playbackClip != null &&
                 playbackClip.frequency == sampleRate &&
-                playbackClip.channels == channels)
+                playbackClip.channels == 1)
             {
                 audioSource.clip = playbackClip;
                 return;
@@ -1129,7 +1128,9 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             playbackClip = AudioClip.Create(
                 nameof(OnAudioFilterReadVcOutput),
                 sampleRate,
-                channels,
+                // The carrier represents the mono network voice. Unity expands and
+                // spatializes it into the active output layout before the callback.
+                1,
                 sampleRate,
                 false);
             FillPlaybackClip(playbackClip);
