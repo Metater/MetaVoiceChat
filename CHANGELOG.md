@@ -9,6 +9,7 @@
 - PurrNetNetProvider. Thank you Nikita Kolpakov!
 - Opus IL2CPP support. Thank you ThijsCleVR!
 - Fix IsLocalPlayerDeafened NREs. Thank you Hypercat!
+- RiptideNetworkingNetProvider. Thank you Joao Victor Oliveira!
 
 12/20/2025 (v4.2):
 - MirrorNetProvider: Fix null reference if a player joins late with incoming audio frames #21. Thanks @EterniumDev

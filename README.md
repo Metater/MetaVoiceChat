@@ -1,15 +1,111 @@
 ![MetaVoiceChat Banner](Images/MetaVoiceChat.png)
 
+## Games Using MetaVoiceChat
+
+*Peak concurrent players checked August 2026. Demo peaks are shown where relevant.*
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/4285690/Airport_Security_Sucks/"><img src="https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4285690/83c3f74745f699f49074f3e37b3795ded1ecc841/header.jpg?t=1781148486" width="100%" alt="Airport Security Sucks!"></a><br>
+<b><a href="https://store.steampowered.com/app/4285690/Airport_Security_Sucks/">Airport Security Sucks!</a></b><br>
+<sub>Made by the creator of MetaVoiceChat</sub><br>
+Demo peak: <b>4,373</b> · Full game peak: <b>705</b>
+</td>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/4001890/How_to_Fish/"><img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4001890/45c4ddff4901e32c4b8b643e1b97d0d01898d299/header.jpg?t=1787234618" width="100%" alt="How to Fish"></a><br>
+<b><a href="https://store.steampowered.com/app/4001890/How_to_Fish/">How to Fish</a></b><br>
+Peak CCU: <b>373,971</b>
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/4656000/BOMBANANA/"><img src="https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4656000/99c086faba625a8d3bc459bab444087d257ccbe1/header.jpg?t=1787520792" width="100%" alt="BOMBANANA!"></a><br>
+<b><a href="https://store.steampowered.com/app/4656000/BOMBANANA/">BOMBANANA!</a></b><br>
+Demo peak CCU: <b>40,119</b>
+</td>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/2794590/Scam_Line/"><img src="https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2794590/373990e793edf8e2ff544c1180aa15f7f07a75e2/header.jpg?t=1785941542" width="100%" alt="Scam Line"></a><br>
+<b><a href="https://store.steampowered.com/app/2794590/Scam_Line/">Scam Line</a></b><br>
+Peak CCU: <b>2,246</b>
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/4279630/Friendly_Steps/"><img src="https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4279630/d649d4743f436dd3a82c1de496bff1d29c5bf26e/header.jpg?t=1787618841" width="100%" alt="Friendly Steps"></a><br>
+<b><a href="https://store.steampowered.com/app/4279630/Friendly_Steps/">Friendly Steps</a></b><br>
+Demo peak CCU: <b>2,485</b>
+</td>
+<td width="50%" valign="top">
+<a href="https://store.steampowered.com/app/3376480/Delivery__Beyond/"><img src="https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3376480/6995eea8465b23c205d348bd0f23c41800457b3e/header.jpg?t=1783623324" width="100%" alt="Delivery & Beyond"></a><br>
+<b><a href="https://store.steampowered.com/app/3376480/Delivery__Beyond/">Delivery & Beyond</a></b><br>
+Peak CCU: <b>994</b>
+</td>
+</tr>
+</table>
+
+### Other Projects
+
+<a href="https://github.com/CodedImmersions/MirrorVR"><img src="https://github.com/user-attachments/assets/c01469e8-f37d-4747-bec2-060ce7ad1ce6" width="420" alt="MirrorVR"></a><br>
+**[MirrorVR](https://github.com/CodedImmersions/MirrorVR)** - Open-source VR project using MetaVoiceChat.
+
 ## Contact and Support
 - Discord: metater
 - Support in my Discord server: https://discord.gg/k4ZtGAA2Nt
     - Just post in #meta-voice-chat-support and ping me
 
 ## Supported Networking Solutions
-- [Mirror](https://github.com/MirrorNetworking/Mirror)
-- [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/)
-- [FishNet](https://github.com/FirstGearGames/FishNet)
-- [Netick](https://github.com/NetickNetworking/NetickForUnity)
+
+<table>
+<tr>
+<td width="33%" valign="top" align="center">
+<a href="https://github.com/MirrorNetworking/Mirror">
+  <img src="https://opengraph.githubassets.com/1/MirrorNetworking/Mirror" width="100%" alt="Mirror">
+</a><br>
+<b><a href="https://github.com/MirrorNetworking/Mirror">Mirror</a></b><br>
+<sub>Open-source Unity networking library</sub>
+</td>
+<td width="33%" valign="top" align="center">
+<a href="https://docs-multiplayer.unity3d.com/netcode/current/about/">
+  <img src="https://opengraph.githubassets.com/1/Unity-Technologies/com.unity.netcode.gameobjects" width="100%" alt="Netcode for GameObjects">
+</a><br>
+<b><a href="https://docs-multiplayer.unity3d.com/netcode/current/about/">Netcode for GameObjects</a></b><br>
+<sub>Unity's official high-level netcode solution</sub>
+</td>
+<td width="33%" valign="top" align="center">
+<a href="https://github.com/FirstGearGames/FishNet">
+  <img src="https://opengraph.githubassets.com/1/FirstGearGames/FishNet" width="100%" alt="FishNet">
+</a><br>
+<b><a href="https://github.com/FirstGearGames/FishNet">FishNet</a></b><br>
+<sub>Unity Networking Evolved</sub>
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top" align="center">
+<a href="https://github.com/NetickNetworking/NetickForUnity">
+  <img src="https://opengraph.githubassets.com/1/NetickNetworking/NetickForUnity" width="100%" alt="Netick">
+</a><br>
+<b><a href="https://github.com/NetickNetworking/NetickForUnity">Netick</a></b><br>
+<sub>C# networking solution for Unity</sub>
+</td>
+<td width="33%" valign="top" align="center">
+<a href="https://github.com/PurrNet/PurrNet">
+  <img src="https://opengraph.githubassets.com/1/PurrNet/PurrNet" width="100%" alt="PurrNet">
+</a><br>
+<b><a href="https://github.com/PurrNet/PurrNet">PurrNet</a></b><br>
+<sub>A Purrfect Unity networking solution</sub>
+</td>
+<td width="33%" valign="top" align="center">
+<a href="https://github.com/RiptideNetworking/Riptide">
+  <img src="https://opengraph.githubassets.com/1/RiptideNetworking/Riptide" width="100%" alt="Riptide">
+</a><br>
+<b><a href="https://github.com/RiptideNetworking/Riptide">Riptide</a></b><br>
+<sub>Lightweight C# networking for multiplayer games</sub>
+</td>
+</tr>
+</table>
 
 Other Unity networking solutions can easily be implemented by composing an agnostic MonoBehaviour and implementing a minimal interface — please feel free to contribute additional network provider implementations. Please make PRs with any of your changes or improvements if you feel they would be helpful to the public. Please create issues for things as you see fit.
 
@@ -22,9 +118,7 @@ Other Unity networking solutions can easily be implemented by composing an agnos
 - [Tips](#tips)
 - [Thank Yous](#thank-yous)
 - [Network Providers](#network-providers)
-- [Missing Things](#missing-things)
-    - [Network Providers](#missing-network-providers)
-    - [Features](#missing-features)
+- [Missing Features](#missing-features)
 - [Extending Functionality](#extending-functionality)
     - [Network Provider](#how-do-i-write-a-network-provider-implementation)
     - [VcAudioInput](#how-do-i-write-a-vcaudioinput)
@@ -172,20 +266,12 @@ https://youtu.be/2fSqSAnRS5M
 ## Network Providers
 - [Mirror](https://github.com/MirrorNetworking/Mirror)
 - [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/)
-- [Fish-Net](https://fish-networking.gitbook.io/docs)
+- [FishNet](https://github.com/FirstGearGames/FishNet)
 - [Netick](https://github.com/NetickNetworking/NetickForUnity)
-
-## Missing Things
-
-### Missing Network Providers
-- [LiteNetLib](https://github.com/RevenantX/LiteNetLib)
-- [LiteEntitySystem](https://github.com/RevenantX/LiteEntitySystem)
-- [Dark Rift 2](https://github.com/DarkRiftNetworking/DarkRift)
-- [Unity WebRTC](https://github.com/Unity-Technologies/com.unity.webrtc)
-- [Photon Unity Networking 2](https://www.photonengine.com/pun)
 - [PurrNet](https://github.com/PurrNet/PurrNet)
+- [Riptide](https://github.com/RiptideNetworking/Riptide)
 
-### Missing Features
+## Missing Features
 - Configurable sampling rates
 - Multithreading for Opus
 - Compared to [Dissonance Voice Chat](https://assetstore.unity.com/packages/tools/audio/dissonance-voice-chat-70078)
@@ -207,7 +293,7 @@ https://youtu.be/2fSqSAnRS5M
     - [FishNet network provider implementation](NetProviders/FishNet/FishNetNetProvider.cs)
     - [NGO network provider implementation](NetProviders/NGO/NgoNetProvider.cs)
     - [Netick network provider implementation](NetProviders/Netick/NetickNetProvider.cs)
-- For network solutions that do not have define symbols (i.e. Netcode for GameObjects), just make the PR with your own define symbol #if over each file. I will put a nested Unity package with a #define META_VOICE_CHAT_FOR_NGO script or whatever in the release so users can just double click the package to install the provider.
+- For network solutions that do not have define symbols (i.e. Netcode for GameObjects), just make the PR with your own define symbol #if over each file. I will put a nested Unity package with a #define METAVC_NGO script or whatever in the release so users can just double click the package to install the provider.
 - Just make a PR and I will check it out! Thanks!
 
 ### How do I write a VcAudioInput?
@@ -231,10 +317,6 @@ https://youtu.be/2fSqSAnRS5M
 - Ideas for you: implement dynamic player mouth movement by listening to the RMS of incoming samples
 - Extend VcOutputFilter and implement Filter(int index, float[] samples, float targetLatency)
 - Directly modify the samples array to achieve the desired filter. The incoming samples array may be null.
-
-## Things Using MetaVoiceChat
-- <b>[MirrorVR](https://github.com/MirrorVR/MirrorVR)</b>
-- My game <b>Tater Tussle</b>
 
 ## License
 - This project is licensed under the [MIT License](LICENSE)
