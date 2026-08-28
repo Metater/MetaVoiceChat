@@ -1,5 +1,6 @@
-8/22/2026 (v4.3):
+8/27/2026 (v4.3):
 - Drop in replacement NetEQ playback algorithm (https://github.com/Metater/meta-voice-chat-neteq)
+    - Fixes high and low pitched voice bug after lag spikes and super rare crackley / cut out voice bc insufficient buffer
 - Better audio quality because of incorrectly selected bandwidth for 48kHz: https://wiki.xiph.org/Opus_Recommended_Settings
     - Was "WideBand", now its "FullBand". "WideBand" is for 16kHz.
 - Opus "Auto" mode instead of forcing "SILK"
@@ -7,6 +8,7 @@
 - Improved FishNetNetProvider. Thank you How to Fish team!
 - PurrNetNetProvider. Thank you Nikita Kolpakov!
 - Opus IL2CPP support. Thank you ThijsCleVR!
+- Fix IsLocalPlayerDeafened NREs. Thank you Hypercat!
 
 12/20/2025 (v4.2):
 - MirrorNetProvider: Fix null reference if a player joins late with incoming audio frames #21. Thanks @EterniumDev
