@@ -1,3 +1,4 @@
+#if METAVC_RIPTIDE
 using System;
 using System.Collections.Generic;
 using MetaVoiceChat.Utils;
@@ -142,3 +143,4 @@ namespace MetaVoiceChat.NetProviders.Riptide
         #endregion
     }
 }
+#endif
