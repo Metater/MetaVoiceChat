@@ -303,14 +303,6 @@ https://youtu.be/2fSqSAnRS5M
 
 ### Another thank you to [Concentus: Opus for Everyone](https://github.com/lostromb/concentus) for their native C# implementation of Opus that makes it extremely easy to add Opus to projects like this.
 
-## Network Providers
-- [Mirror](https://github.com/MirrorNetworking/Mirror)
-- [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/)
-- [FishNet](https://github.com/FirstGearGames/FishNet)
-- [Netick](https://github.com/NetickNetworking/NetickForUnity)
-- [PurrNet](https://github.com/PurrNet/PurrNet)
-- [Riptide](https://github.com/RiptideNetworking/Riptide)
-
 ## Missing Features
 - Configurable sampling rates
 - Multithreading for Opus
