@@ -19,7 +19,7 @@ namespace MetaVoiceChat.NetProviders.Mirror
         public static IReadOnlyList<MirrorNetProvider> Instances => instances;
         #endregion
 
-        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance.MetaVc.isDeafened;
+        bool INetProvider.IsLocalPlayerDeafened => LocalPlayerInstance != null && LocalPlayerInstance.MetaVc.isDeafened;
 
         public MetaVc MetaVc { get; private set; }
 
