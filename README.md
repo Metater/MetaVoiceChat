@@ -165,7 +165,6 @@ Other Unity networking solutions can easily be implemented by composing an agnos
     - [VcAudioOutput](#how-do-i-write-a-vcaudiooutput)
     - [VcInputFilter](#how-do-i-write-a-vcinputfilter)
     - [VcOutputFilter](#how-do-i-write-a-vcoutputfilter)
-- [Things Using MetaVoiceChat](#things-using-metavoicechat)
 - [License](#license)
 - [Contact and Support](#contact-and-support)
 - [Examples](Examples/)
@@ -283,12 +282,17 @@ https://youtu.be/2fSqSAnRS5M
 11. Connect your voice chat output Audio Source to the "Audio Source" field under the "Vc Audio Source Output" component.
 12. Connect the "Meta Vc" fields under your audio input and output to the "Meta Vc" sibling component.
 13. At this point, the "Voice Chat" game object should look like this: ![TutorialD](Images/TutorialD.png)
-14. <b>You are done!!! See [Examples](Examples/) for advanced usage.</b>
-15. <b>Optionally</b>, you can install [Vatsal Ambastha's RNNoise4Unity](https://github.com/adrenak/RNNoise4Unity) to use the noise suppression [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs).
-16. Be sure to follow the scoped registry setup instructions for [RNNoise4Unity](https://github.com/adrenak/RNNoise4Unity).
-17. Uncomment the <i>#define ENABLE_RNNOISE_FOR_META_VOICE_CHAT</i> in [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs).
-18. Set up [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs) like this: ![TutorialE](Images/TutorialE.png)
-19. Now you are even more done! See [tips](#tips) below.
+14. As of v4.3, it is recommended to use [OnAudioFilterReadVcOutput](Output/OnAudioFilterReadVcOutput/OnAudioFilterReadVcOutput.cs) because it fixes two playback bugs with [VcAudioSourceOutput](Output/AudioSource/VcAudioSourceOutput.cs). Set up as follows.
+15. Delete the [VcAudioSourceOutput](Output/AudioSource/VcAudioSourceOutput.cs) and add [OnAudioFilterReadVcOutput](Output/OnAudioFilterReadVcOutput/OnAudioFilterReadVcOutput.cs) directly to the Audio Source you want to be the voice chat mouth. ![TutorialF](Images/TutorialF.png)
+16. Assign "Meta Vc" on [OnAudioFilterReadVcOutput](Output/OnAudioFilterReadVcOutput/OnAudioFilterReadVcOutput.cs).
+17. Click the nipple on "Audio Filter Read Config" and assign the default VC config.
+18. Ensure you assign this as the new "Audio Output" under "Meta Vc". ![TutorialG](Images/TutorialG.png)
+19. You can mess around with the VC config scriptable object. If for some reason you run into crackling on a terrible computer or really bad network conditions, you can switch the "Jitter Buffer Mode" from "Low Latency" to "Balanced". I have never had the need to do this though. Test first.
+20. <b>Optionally</b>, you can install [Vatsal Ambastha's RNNoise4Unity](https://github.com/adrenak/RNNoise4Unity) to use the noise suppression [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs).
+21. Be sure to follow the scoped registry setup instructions for [RNNoise4Unity](https://github.com/adrenak/RNNoise4Unity).
+22. Uncomment the <i>#define ENABLE_RNNOISE_FOR_META_VOICE_CHAT</i> in [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs).
+23. Set up [RnnoiseVcInputFilter](rnnoise/RnnoiseVcInputFilter.cs) like this: ![TutorialE](Images/TutorialE.png)
+24. See [tips](#tips) below or [Examples](Examples/) for advanced usage.
 
 ## Tips
 - Change Project Settings/Audio/DSP Buffer Size from "Best performance" to "Best latency"

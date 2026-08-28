@@ -1,4 +1,4 @@
-8/27/2026 (v4.3):
+8/28/2026 (v4.3):
 - Drop in replacement NetEQ playback algorithm (https://github.com/Metater/meta-voice-chat-neteq)
     - Fixes high and low pitched voice bug after lag spikes and super rare crackley / cut out voice bc insufficient buffer
 - Better audio quality because of incorrectly selected bandwidth for 48kHz: https://wiki.xiph.org/Opus_Recommended_Settings
