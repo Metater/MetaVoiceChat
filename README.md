@@ -1,5 +1,50 @@
 ![MetaVoiceChat Banner](Images/MetaVoiceChat.png)
 
+## Contact and Support
+
+<table>
+<tr>
+<td width="46%" align="center" valign="middle">
+
+<a href="https://github.com/Metater">
+  <img src="https://avatars.githubusercontent.com/Metater" width="85" alt="Metater">
+</a>
+
+### [Metater](https://github.com/Metater)
+
+<a href="https://github.com/Metater">
+  <img src="https://img.shields.io/github/followers/Metater?style=flat&logo=github&label=Followers" alt="GitHub followers">
+</a>
+
+**Discord:** `metater`
+
+</td>
+<td width="54%" align="center" valign="middle">
+
+### MetaVoiceChat Support
+
+<a href="https://discord.gg/k4ZtGAA2Nt">
+  <img src="https://shieldcn.dev/discord/members/k4ZtGAA2Nt.svg?variant=branded" alt="Discord members">
+</a>
+<a href="https://discord.gg/k4ZtGAA2Nt">
+  <img src="https://shieldcn.dev/discord/online-members/k4ZtGAA2Nt.svg?variant=branded" alt="Discord online">
+</a>
+
+<br><br>
+
+<a href="https://discord.gg/k4ZtGAA2Nt">
+  <img src="https://img.shields.io/badge/Join_the_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord">
+</a>
+
+<br><br>
+
+For help, post in **#meta-voice-chat-support** and ping **@metater**.
+
+</td>
+</tr>
+</table>
+
+
 ## Games Using MetaVoiceChat
 
 *Peak concurrent players checked August 2026. Demo peaks are shown where relevant.*
@@ -50,51 +95,6 @@ Peak CCU: <b>994</b>
 
 <a href="https://github.com/CodedImmersions/MirrorVR"><img src="https://github.com/user-attachments/assets/c01469e8-f37d-4747-bec2-060ce7ad1ce6" width="420" alt="MirrorVR"></a><br>
 **[MirrorVR](https://github.com/CodedImmersions/MirrorVR)** - Open-source VR project using MetaVoiceChat.
-
-## Contact and Support
-
-<table>
-<tr>
-<td width="46%" align="center" valign="middle">
-
-<a href="https://github.com/Metater">
-  <img src="https://avatars.githubusercontent.com/Metater" width="85" alt="Metater">
-</a>
-
-### [Metater](https://github.com/Metater)
-
-<a href="https://github.com/Metater">
-  <img src="https://img.shields.io/github/followers/Metater?style=flat&logo=github&label=Followers" alt="GitHub followers">
-</a>
-
-**Discord:** `metater`
-
-</td>
-<td width="54%" align="center" valign="middle">
-
-### MetaVoiceChat Support
-
-<a href="https://discord.gg/k4ZtGAA2Nt">
-  <img src="https://shieldcn.dev/discord/members/k4ZtGAA2Nt.svg?variant=branded" alt="Discord members">
-</a>
-<a href="https://discord.gg/k4ZtGAA2Nt">
-  <img src="https://shieldcn.dev/discord/online-members/k4ZtGAA2Nt.svg?variant=branded" alt="Discord online">
-</a>
-
-<br><br>
-
-<a href="https://discord.gg/k4ZtGAA2Nt">
-  <img src="https://img.shields.io/badge/Join_the_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord">
-</a>
-
-<br><br>
-
-For help, post in **#meta-voice-chat-support** and ping **@metater**.
-
-</td>
-</tr>
-</table>
-
 
 ## Supported Networking Solutions
 
