@@ -362,8 +362,3 @@ https://youtu.be/2fSqSAnRS5M
 - This project is licensed under the [MIT License](LICENSE)
 - You are technically permitted to sell this project exactly as it is under the MIT license, but please don't. Just share this project for free with others that would like to use it.
 - Now go and make great games, whether for profit or free, using this! Please share links to your projects -- I would love to see what you all make!
-
-## Contact and Support
-- Discord: metater
-- Support in my Discord server: https://discord.gg/k4ZtGAA2Nt
-    - Just post in #meta-voice-chat-support and ping me
