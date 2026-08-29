@@ -1,0 +1,22 @@
+{
+  "name": "com.metater.metavoicechat",
+  "version": "3",
+  "displayName": "MetaVoiceChat",
+  "description": "Self-contained proximity voice chat solution for Unity.",
+  "unity": "2021.3",
+  "unityRelease": "35",
+  "documentationUrl": "https://github.com/Metater/MetaVoiceChat#tutorial",
+  "changelogUrl": "https://github.com/Metater/MetaVoiceChat/releases",
+  "licensesUrl": "https://github.com/Metater/MetaVoiceChat/blob/main/LICENSE",
+  "keywords": [
+    "Voice",
+    "Network",
+    "Mirror",
+    "Fish",
+    "FishNet"
+  ],
+  "author": {
+    "name": "Metater",
+    "email": "unity@example.com"
+  }
+}
