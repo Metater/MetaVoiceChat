@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using MetaVoiceChat.Core.AEC3;
 using MetaVoiceChat.Native;
 using UnityEngine;
 
@@ -28,14 +29,17 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
         private MvcInterop.Engine engine;
         private MvcInterop.Packet pendingPacket;
         private uint voiceId;
+        private int outputSampleRate;
         private int outputChannels;
         private int callbacksBlocked = 1;
         private int audioCallbackDepth;
         private int restartRequested;
         private int audioThreadFailure;
         private int cachedRenderDelayMs = DefaultRenderDelayMs;
+        private int renderReferenceEnabled;
         private bool hasPendingPacket;
         private bool failureLogged;
+        private bool missingListenerWarningLogged;
 
         private void OnEnable()
         {
@@ -52,12 +56,14 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             audioSource = GetComponent<AudioSource>();
             ConfigureAudioSource(audioSource);
             AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
+            AudioListenerVcInput.OnAudioFilterReadEvent += OnAudioListenerRender;
             StartLoopback();
         }
 
         private void OnDisable()
         {
             AudioSettings.OnAudioConfigurationChanged -= OnAudioConfigurationChanged;
+            AudioListenerVcInput.OnAudioFilterReadEvent -= OnAudioListenerRender;
             StopLoopback();
         }
 
@@ -83,6 +89,17 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             }
 
             PumpLoopbackPackets();
+
+            if (Volatile.Read(ref renderReferenceEnabled) != 0 &&
+                AudioListenerVcInput.InstanceCount == 0 &&
+                !missingListenerWarningLogged)
+            {
+                missingListenerWarningLogged = true;
+                Debug.LogWarning(
+                    $"AEC3 is enabled, but no {nameof(AudioListenerVcInput)} is active. " +
+                    "Add one to the main camera beside its AudioListener.",
+                    this);
+            }
 
             int failure = Interlocked.Exchange(ref audioThreadFailure, 0);
             if (failure < 0 && !failureLogged)
@@ -125,6 +142,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 }
 
                 int sampleRate = AudioSettings.outputSampleRate;
+                outputSampleRate = sampleRate;
                 outputChannels = GetSpeakerModeChannelCount(AudioSettings.speakerMode);
                 AudioSettings.GetDSPBufferSize(out int dspBufferFrames, out _);
                 int maximumCallbackFrames = Math.Max(MinimumMaximumCallbackFrames, dspBufferFrames);
@@ -136,6 +154,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     return;
                 }
 
+                MvcInterop.ProcessingFlags processingFlags = GetProcessingFlags();
                 MvcInterop.Config config = new MvcInterop.Config
                 {
                     CaptureSource = MvcInterop.CaptureSource.DefaultMicrophone,
@@ -145,10 +164,13 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     MaximumCallbackFrames = (uint)maximumCallbackFrames,
                     OpusPacketDurationMs = GetPacketDurationMs(),
                     MaximumRemoteVoices = 1,
-                    ProcessingFlags = GetProcessingFlags(),
+                    ProcessingFlags = processingFlags,
                 };
 
                 Volatile.Write(ref cachedRenderDelayMs, GetConfiguredRenderDelayMs());
+                Volatile.Write(
+                    ref renderReferenceEnabled,
+                    (processingFlags & MvcInterop.ProcessingFlags.Aec3) != 0 ? 1 : 0);
 
                 MvcInterop.Result result = MvcInterop.Create(config, out MvcInterop.Engine createdEngine);
                 if (result != MvcInterop.Result.Ok)
@@ -183,6 +205,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 CreatePlaybackClip(sampleRate);
                 hasPendingPacket = false;
                 failureLogged = false;
+                missingListenerWarningLogged = false;
                 Interlocked.Exchange(ref audioThreadFailure, 0);
                 Volatile.Write(ref callbacksBlocked, 0);
                 audioSource.Play();
@@ -214,6 +237,7 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
             MvcInterop.Engine activeEngine = engine;
             engine = null;
             voiceId = 0;
+            Volatile.Write(ref renderReferenceEnabled, 0);
             hasPendingPacket = false;
 
             if (activeEngine != null)
@@ -302,16 +326,8 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                 return;
             }
 
-            if (Volatile.Read(ref callbacksBlocked) != 0)
+            if (!TryEnterAudioCallback())
             {
-                Array.Clear(data, 0, data.Length);
-                return;
-            }
-
-            Interlocked.Increment(ref audioCallbackDepth);
-            if (Volatile.Read(ref callbacksBlocked) != 0)
-            {
-                Interlocked.Decrement(ref audioCallbackDepth);
                 Array.Clear(data, 0, data.Length);
                 return;
             }
@@ -335,19 +351,77 @@ namespace MetaVoiceChat.Output.OnAudioFilterReadVcOutput
                     Array.Clear(data, 0, data.Length);
                 }
 
-                MvcInterop.Result renderResult = activeEngine.SubmitRender(
-                    data,
+            }
+            finally
+            {
+                ExitAudioCallback();
+            }
+        }
+
+        private void OnAudioListenerRender(AudioListenerVcInput.OnAudioFilterReadFrame frame)
+        {
+            if (Volatile.Read(ref renderReferenceEnabled) == 0 ||
+                frame.data == null ||
+                frame.dataLength <= 0 ||
+                frame.dataLength > frame.data.Length ||
+                frame.channels <= 0 ||
+                frame.dataLength % frame.channels != 0)
+            {
+                return;
+            }
+
+            if (!TryEnterAudioCallback())
+            {
+                return;
+            }
+
+            try
+            {
+                MvcInterop.Engine activeEngine = engine;
+                if (activeEngine == null ||
+                    frame.sampleRateHz != outputSampleRate ||
+                    frame.channels != outputChannels)
+                {
+                    return;
+                }
+
+                uint frameCount = (uint)(frame.dataLength / frame.channels);
+                MvcInterop.Result result = activeEngine.SubmitRender(
+                    frame.data,
                     frameCount,
                     Volatile.Read(ref cachedRenderDelayMs));
-                if ((int)renderResult < 0)
+
+                if ((int)result < 0)
                 {
-                    Interlocked.CompareExchange(ref audioThreadFailure, (int)renderResult, 0);
+                    Interlocked.CompareExchange(ref audioThreadFailure, (int)result, 0);
                 }
             }
             finally
             {
-                Interlocked.Decrement(ref audioCallbackDepth);
+                ExitAudioCallback();
             }
+        }
+
+        private bool TryEnterAudioCallback()
+        {
+            if (Volatile.Read(ref callbacksBlocked) != 0)
+            {
+                return false;
+            }
+
+            Interlocked.Increment(ref audioCallbackDepth);
+            if (Volatile.Read(ref callbacksBlocked) == 0)
+            {
+                return true;
+            }
+
+            Interlocked.Decrement(ref audioCallbackDepth);
+            return false;
+        }
+
+        private void ExitAudioCallback()
+        {
+            Interlocked.Decrement(ref audioCallbackDepth);
         }
 
         private void CreatePlaybackClip(int sampleRate)
