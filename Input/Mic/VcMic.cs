@@ -5,8 +5,11 @@ using UnityEngine;
 
 namespace MetaVoiceChat.Input.Mic
 {
-    public class VcMic : IDisposable
+    public partial class VcMic : IDisposable
     {
+        // Reads may run this much faster than real time, which absorbs capture clock drift.
+        private const double RefillRatio = 1.1;
+
         private readonly MonoBehaviour coroutineProvider;
         private readonly int samplesPerFrame;
 
@@ -118,6 +121,14 @@ namespace MetaVoiceChat.Input.Mic
             }
         }
 
+        // Skips samples that are overwritten or about to be. The margin keeps reads clear of the write position.
+        private static int Resync(int readAbsPos, int currAbsPos, int ringSamples, int marginSamples) =>
+            Math.Max(readAbsPos, currAbsPos - ringSamples + marginSamples);
+
+        // Refills the read budget, in samples, for the time elapsed since the last pass, up to one ring.
+        private static double Refill(double budget, double elapsedSeconds, int ringSamples, int samplesPerSecond) =>
+            Math.Min(ringSamples, budget + elapsedSeconds * samplesPerSecond * RefillRatio);
+
         private IEnumerator CoRecord()
         {
             int i = 0;
@@ -125,9 +136,18 @@ namespace MetaVoiceChat.Input.Mic
             int prevPos = 0;
             float[] samples = new float[samplesPerFrame];
 
+            // Reads draw on a budget of samples, one ring deep, that refills at slightly above real time. A device that
+            // delivers faster than real time cannot hold this loop, and a hitch of up to one ring is read in full.
+            double budget = AudioClip.samples;
+            System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+            double lastSeconds = 0;
+
             while (AudioClip != null && Microphone.IsRecording(ActiveDevice))
             {
                 bool isNewDataAvailable = true;
+                double nowSeconds = clock.Elapsed.TotalSeconds;
+                budget = Refill(budget, nowSeconds - lastSeconds, AudioClip.samples, AudioClip.frequency);
+                lastSeconds = nowSeconds;
 
                 while (isNewDataAvailable)
                 {
@@ -140,9 +160,10 @@ namespace MetaVoiceChat.Input.Mic
                     prevPos = currPos;
 
                     int currAbsPos = i * AudioClip.samples + currPos;
+                    readAbsPos = Resync(readAbsPos, currAbsPos, AudioClip.samples, samples.Length);
                     int nextReadAbsPos = readAbsPos + samples.Length;
 
-                    if (nextReadAbsPos < currAbsPos)
+                    if (nextReadAbsPos < currAbsPos && budget >= samples.Length)
                     {
                         // A possible optimization is to allocate a larger fixed sized pooled array
                         // Allocate the array size by the number of samples that are ready to read
@@ -155,6 +176,7 @@ namespace MetaVoiceChat.Input.Mic
                         OnFrameReady?.Invoke(index, samples);
 
                         readAbsPos = nextReadAbsPos;
+                        budget -= samples.Length;
                         isNewDataAvailable = true;
                     }
                     else
